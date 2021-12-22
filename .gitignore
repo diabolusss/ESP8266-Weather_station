@@ -1,3 +1,6 @@
+# file with secret variables
+secret.h
+
 # Prerequisites
 *.d
 
