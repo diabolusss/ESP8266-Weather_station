@@ -1,3 +1,4 @@
+#define DEBUG
 #include "settings.h"
 #include "UIHelper.h"
 
@@ -13,8 +14,19 @@
  *****************************/
  
  ICACHE_RAM_ATTR void btnPressedISR() {
-    Serial.println("BTN pressed!!!");
-    triggerDisplayWakeup = true;
+    PRINTF("BTN pressed!!! %d",display.isAwake());
+    if(display.isAwake()){
+      display.displayOff();
+      //triggerDisplayWakeup = false;
+      isDisplayOn = false;
+      
+      displaySleepTicker.detach();
+    }else{
+      display.displayOn();
+      //triggerDisplayWakeup = true;
+      isDisplayOn = true;
+      displaySleepTicker.attach(DISPLAY_SLEEP_INTERVAL_SECS, displayOff);
+    }
   }
 
 void setup() {
@@ -35,51 +47,75 @@ void setup() {
 
   //This begins the CCS811 sensor and prints error status of .beginWithStatus()
   CCS811Core::CCS811_Status_e returnCode = MCU811b.beginWithStatus();
-    Serial.print("CCS811 begin exited with: ");
-    Serial.println(MCU811b.statusString(returnCode));
+    PRINT("CCS811 begin exited with: ");
+    PRINTLN(MCU811b.statusString(returnCode));
 
   {
     hdc1080.begin(HDC1080_I2C_ADDR);
-      Serial.print("Manufacturer ID=0x");
-      Serial.println(hdc1080.readManufacturerId(), HEX); // 0x5449 ID of Texas Instruments
-      Serial.print("Device ID=0x");
-      Serial.println(hdc1080.readDeviceId(), HEX); // 0x1050 ID of the device
+      PRINT("Manufacturer ID=0x");
+      PRINTLN2(hdc1080.readManufacturerId(), HEX); // 0x5449 ID of Texas Instruments
+      PRINT("Device ID=0x");
+      PRINTLN2(hdc1080.readDeviceId(), HEX); // 0x1050 ID of the device
+      PRINT("Device Serial Number=");
+      HDC1080_SerialNumber sernum = hdc1080.readSerialNumber();
+      char format[12];
+      sprintf(format, "%02X-%04X-%04X", sernum.serialFirst, sernum.serialMid, sernum.serialLast);
+      PRINTLN(format);
+      
     hdc1080.setResolution(HDC1080_TEMP_RESOLUTION_BITS, HDC1080_HUMID_RESOLUTION_BITS);
+    delay(10);
+    
     //WRONG!!!
     //14:51:24.915 -> Measurement Resolution: T=0 (0=14 bit, 1=11 bit) RH=1 (00=14 bit, 01=11 bit, 10=8 bit)
     HDC1080_Registers reg = hdc1080.readRegister();
-      Serial.print("Measurement Resolution: T=");
-      Serial.print(reg.TemperatureMeasurementResolution, BIN);
-      Serial.print(" (0=14 bit, 1=11 bit)");
+      PRINT("Measurement Resolution: T=");
+      PRINT2(reg.TemperatureMeasurementResolution, BIN);
+      PRINT(" (0=14 bit, 1=11 bit)");
     
-      Serial.print(" RH=");
-      Serial.print(reg.HumidityMeasurementResolution, BIN);
-      Serial.println(" (00=14 bit, 01=11 bit, 10=8 bit)");
+      PRINT(" RH=");
+      PRINT2(reg.HumidityMeasurementResolution, BIN);
+      PRINTLN(" (00=14 bit, 01=11 bit, 10=8 bit)");
+
+      PRINT("Software reset bit: ");
+      PRINT2(reg.SoftwareReset, BIN);
+      PRINTLN(" (0=Normal Operation, 1=Software Reset)");
+    
+      PRINT("Heater: ");
+      PRINT2(reg.Heater, BIN);
+      PRINTLN(" (0=Disabled, 1=Enabled)");
+    
+      PRINT("Mode of Acquisition: ");
+      PRINT2(reg.ModeOfAcquisition, BIN);
+      PRINTLN(" (0=T or RH is acquired, 1=T and RH are acquired in sequence, T first)");
+    
+      PRINT("Battery Status: ");
+      PRINT2(reg.BatteryStatus, BIN);
+      PRINTLN(" (0=Battery voltage > 2.8V, 1=Battery voltage < 2.8V)");
+
   }
 
   {
-    Wire.beginTransmission(Atom_ADDR);
+    Wire.beginTransmission(BMP180_I2C_ADDR);
     //initialize Atmosphere sensor
     if (!bmp.begin()) {
-      Serial.println("Could not find BMP180 or BMP085 sensor at 0x77");
+      PRINTLN("Could not find BMP180 or BMP085 sensor at 0x77");
     }else{
-      Serial.println("Found BMP180 or BMP085 sensor at 0x77");
+      PRINTLN("Found BMP180 or BMP085 sensor at 0x77");
     }
     Wire.endTransmission();
   }
 
   //initialize light sensor
-  Wire.beginTransmission(Light_ADDR);
-  Wire.write(0b00000001);
+  Wire.beginTransmission(BH1750FVI_I2C_ADDR);
+    Wire.write(BH1750FVI_POWERON);
   Wire.endTransmission();
-
-  //dht.begin();
 
   // initialize display
   display.init();
-  //display.flipScreenVertically();
   
   displayBlank(&display);
+  
+  display.flipScreenVertically();
 
   drawBootWelcome(&display, "Weather Station");
 
@@ -110,10 +146,10 @@ void setup() {
   
   // Inital UI takes care of initalising the display too.
   ui.init();
-  Serial.println("");
+  PRINTLN("");
   
-  while (!client.connect(host, httpPort)) {
-    Serial.println("Connection to thingspeak Failed");
+  while (!client.connect(THINGSPEAK_SERVER, THINGSPEAK_PORT)) {
+    PRINTLN("Connection to thingspeak Failed");
   }
   
   // don't wait for network, observe time changing
@@ -127,6 +163,15 @@ void setup() {
   weatherUpdateTicker.attach(CURR_WEATHER_UPDATE_INTERVAL_SECS,   setReadyForCurrentWeatherUpdate); //minutes
   sensorsDataUploadTicker.attach(TS_WRITE_UPDATE_INTERVAL_SEC,    setReadyForSensorDataUpload);
   sensorsReadTicker.attach(5,                                     setReadyForSensorsRead);
+
+  displaySleepTicker.attach(DISPLAY_SLEEP_INTERVAL_SECS, displayOff);
+}
+
+void displayOff(){
+  if(display.isAwake()){
+    display.displayOff();
+    displaySleepTicker.detach();
+  }
 }
 
 void loop() {  
@@ -134,8 +179,9 @@ void loop() {
   if(readyForSensorsRead){
     readTemperatureHumidity();
     readAtmosphere();
-    if(humi > 0 && temp > 0){ //todo -1 for not initialized + thingspeak don't update such values
-      MCU811b.setEnvironmentalData(humi, temp); //compensate environment
+    if(humidity > 0 && temp > ABSOLUTE_ZERO_TEMP_C){ 
+      MCU811b.setEnvironmentalData(humidity, temp); //compensate CCS811 environment 
+                                                     // NB (dont use builtin hdc1080 as CCS811 introduces heat dissipation error)
     }
     readLight();
     readCCS811b();
@@ -152,7 +198,7 @@ void loop() {
     updateCurrentWeather();
   }
   
-  if(readyForWeatherServiceUpdate && ui.getUiState()->frameState == FIXED) {
+  if(readyForWeatherServiceUpdate && isDisplayOn && ui.getUiState()->frameState == FIXED) {
     updateServiceData(&display);
   }
 
@@ -175,16 +221,16 @@ void readCCS811b(){
     MCU811b.readAlgorithmResults();
 
     eCO2 = MCU811b.getCO2();
-    etVOC = MCU811b.getTVOC();
+    eTVOC = MCU811b.getTVOC();
     
-    Serial.print("CO2[");
+    PRINT("CO2[");
     //Returns calculated CO2 reading
-    Serial.print(eCO2);
-    Serial.print("] tVOC[");
+    PRINT(eCO2);
+    PRINT("] tVOC[");
     //Returns calculated TVOC reading
-    Serial.print(etVOC);
-    Serial.print("]");
-    Serial.println();
+    PRINT(eTVOC);
+    PRINT("]");
+    PRINTLN();
     
   } else if (MCU811b.checkForStatusError())  {
     printSensorError();
@@ -199,43 +245,43 @@ void printSensorError()
 
   if (error == 0xFF) //comm error
   {
-    Serial.println("Failed to get ERROR_ID register.");
+    PRINTLN("Failed to get ERROR_ID register.");
   }
   else
   {
-    Serial.print("Error: ");
+    PRINT("Error: ");
     if (error & 1 << 5)
-      Serial.print("HeaterSupply");
+      PRINT("HeaterSupply");
     if (error & 1 << 4)
-      Serial.print("HeaterFault");
+      PRINT("HeaterFault");
     if (error & 1 << 3)
-      Serial.print("MaxResistance");
+      PRINT("MaxResistance");
     if (error & 1 << 2)
-      Serial.print("MeasModeInvalid");
+      PRINT("MeasModeInvalid");
     if (error & 1 << 1)
-      Serial.print("ReadRegInvalid");
+      PRINT("ReadRegInvalid");
     if (error & 1 << 0)
-      Serial.print("MsgInvalid");
-    Serial.println();
+      PRINT("MsgInvalid");
+    PRINTLN();
   }
 }
 
 //read temperature humidity data
 void readTemperatureHumidity(){
-  humi = hdc1080.readHumidity();
-  Serial.print("hdc1080 T=");
-  Serial.print(hdc1080.readTemperature());
-  Serial.print("C, RH=");
-  Serial.print(humi);
-  Serial.println("%");
+  humidity = hdc1080.readHumidity();
+  PRINT("hdc1080 T=");
+  PRINT(hdc1080.readTemperature()); //dont use it, as CCS811 introduces heat dissipation error
+  PRINT("C, RH=");
+  PRINT(humidity);
+  PRINTLN("%");
 }
 
 void readLight(){
-  Wire.beginTransmission(Light_ADDR);
+  Wire.beginTransmission(BH1750FVI_I2C_ADDR);
     Wire.write(BH1750FVI_RESET_RDATA); //Asynchronous reset/Reset Data register value
   Wire.endTransmission();
  
-  Wire.beginTransmission(Light_ADDR);
+  Wire.beginTransmission(BH1750FVI_I2C_ADDR);
     Wire.write(BH1750FVI_HRES_MODE_ONCE); //hres read and power down; why we don't send power on cmd?
                                           // In one time measurement, Statement moves to power down mode 
                                           //   after measurement completion. If updated result is need
@@ -248,7 +294,7 @@ void readLight(){
     delay(163);//first reading up to 180ms
   #endif
   
-  Wire.requestFrom(Light_ADDR, 2); // 2byte every time
+  Wire.requestFrom(BH1750FVI_I2C_ADDR, 2); // 2byte every time
   for (tempLight = 0; Wire.available() >= 1; ) {
     char c = Wire.read();
     tempLight = (tempLight << 8) + (c & 0xFF);
@@ -256,64 +302,73 @@ void readLight(){
   
   tempLight = LUX_PER_COUNT(tempLight); 
   
-  Serial.print("light: ");
-  Serial.println(tempLight);
+  PRINT("light: ");
+  PRINTLN(tempLight);
 }
 
 
 void readAtmosphere(){
   atmPressure = bmp.readPressure();
-  Serial.print("Pressure = ");
-  Serial.print(atmPressure);
-  Serial.println(" Pascal");
+  PRINT("Pressure = ");
+  PRINT(atmPressure);
+  PRINTLN(" Pascal");
 
   float tempAtm = bmp.readTemperature();
   temp = tempAtm;
-  Serial.print("Temperature = ");
-  Serial.print(tempAtm);
-  Serial.println(" *C");
+  PRINT("Temperature = ");
+  PRINT(tempAtm);
+  PRINTLN(" *C");
         
   // Calculate altitude assuming 'standard' barometric
   // pressure of 1013.25 millibar = 101325 Pascal
   float tempAlt = bmp.readAltitude();
   atmAlt = tempAlt; 
-  Serial.print("Altitude = ");
-  Serial.print(tempAlt);
-  Serial.println(" meters");
+  PRINT("Altitude = ");
+  PRINT(tempAlt);
+  PRINTLN(" meters");
 
-  Serial.print("Pressure at sealevel (calculated) = ");
-  Serial.print(bmp.readSealevelPressure());
-  Serial.println(" Pa");
+  PRINT("Pressure at sealevel (calculated) = ");
+  PRINT(bmp.readSealevelPressure());
+  PRINTLN(" Pa");
 
   // you can get a more precise measurement of altitude
   // if you know the current sea level pressure which will
   // vary with weather and such. If it is 1015 millibars
   // that is equal to 101500 Pascals.
-    Serial.print("Real altitude = ");
-    Serial.print(bmp.readAltitude(101500));
-    Serial.println(" meters");
+    PRINT("Real altitude = ");
+    PRINT(bmp.readAltitude(101500));
+    PRINTLN(" meters");
 }
 
 //upload temperature humidity data to thinkspeak.com
 void uploadTemperatureHumidity(){
-   if(!client.connect(host, httpPort)){
-    Serial.println("connection failed");
+   if(!client.connect(THINGSPEAK_SERVER, THINGSPEAK_PORT)){
+    PRINTLN("connection failed");
     return;
   }
-  // Three values(field1 field2 field3 field4) have been set in thingspeak.com 
-  client.print(String("GET ") + "/update?api_key="+api_key
-    +"&field1="+temp
-    +"&field2="+humi 
-    +"&field3="+tempLight
+
+  String fields = "";
+  if(temp > ABSOLUTE_ZERO_TEMP_C){
+    fields += String("&field1=")+temp;
+  }
+  if(humidity > 0){
+    fields += String("&field2=")+humidity;
+  }
+  fields += String("&field3=")+tempLight
     +"&field4="+atmPressure
     +"&field5="+atmAlt
     +"&field6="+eCO2
-    +"&field7="+etVOC
-    +" HTTP/1.1\r\n" +"Host: " + host + "\r\n" + "Connection: close\r\n\r\n");
+    +"&field7="+eTVOC
+    ;
+    
+  client.print(String("GET ") + "/update?api_key="+THINGSPEAK_API_WRITE + fields 
+    +" HTTP/1.1\r\n" +"Host: " + THINGSPEAK_SERVER 
+    + "\r\n" + "Connection: close\r\n\r\n"
+  );
     
   while(client.available()){
     String line = client.readStringUntil('\r');
-    Serial.print(line);
+    PRINT(line);
   }
   
   readyForSensorDataUpload = false; //reset
@@ -325,63 +380,50 @@ void uploadTemperatureHumidity(){
     currentWeatherClient.updateCurrent(&currentWeather, OPEN_WEATHER_MAP_APP_ID, OPEN_WEATHER_MAP_LOCATION);
 
     delay(100); //do we actually need that here?
-   Serial.println("------------------------------------");
-  
-    // "lon": 8.54, float lon;
-    Serial.printf("lon: %f\n", currentWeather.lon);
-    // "lat": 47.37 float lat;
-    Serial.printf("lat: %f\n", currentWeather.lat);
-    // "id": 521, weatherId weatherId;
-    Serial.printf("weatherId: %d\n", currentWeather.weatherId);
-    // "main": "Rain", String main;
-    Serial.printf("main: %s\n", currentWeather.main.c_str());
-    // "description": "shower rain", String description;
-    Serial.printf("description: %s\n", currentWeather.description.c_str());
-    // "icon": "09d" String icon; String iconMeteoCon;
-    Serial.printf("icon: %s\n", currentWeather.icon.c_str());
-    Serial.printf("iconMeteoCon: %s\n", currentWeather.iconMeteoCon.c_str());
-    // "temp": 290.56, float temp;
-    Serial.printf("temp: %f\n", currentWeather.temp);
-    // "pressure": 1013, uint16_t pressure;
-    Serial.printf("pressure: %d\n", currentWeather.pressure);
-    // "humidity": 87, uint8_t humidity;
-    Serial.printf("humidity: %d\n", currentWeather.humidity);
-    // "temp_min": 289.15, float tempMin;
-    Serial.printf("tempMin: %f\n", currentWeather.tempMin);
-    // "temp_max": 292.15 float tempMax;
-    Serial.printf("tempMax: %f\n", currentWeather.tempMax);
-    // "wind": {"speed": 1.5}, float windSpeed;
-    Serial.printf("windSpeed: %f\n", currentWeather.windSpeed);
-    // "wind": {"deg": 1.5}, float windDeg;
-    Serial.printf("windDeg: %f\n", currentWeather.windDeg);
-    // "clouds": {"all": 90}, uint8_t clouds;
-    Serial.printf("clouds: %d\n", currentWeather.clouds);
-    // "dt": 1527015000, uint64_t observationTime;
+   PRINTLN("------------------------------------");
+
+    PRINTF("country: %s\n", currentWeather.country.c_str());// "country": "CH", String country; 
+    PRINTF("cityName: %s\n", currentWeather.cityName.c_str());// "name": "Zurich", String cityName;
+    
+    PRINTF("lon: %f\n", currentWeather.lon); //float
+    PRINTF("lat: %f\n", currentWeather.lat); //float
+    PRINTF("weatherId: %d\n", currentWeather.weatherId);
+    PRINTF("main: %s\n", currentWeather.main.c_str()); // "main": "Rain", String main;
+    PRINTF("description: %s\n", currentWeather.description.c_str());// "description": "shower rain", String description;
+    PRINTF("icon: %s\n", currentWeather.icon.c_str());// "icon": "09d" String icon; String iconMeteoCon;
+    PRINTF("iconMeteoCon: %s\n", currentWeather.iconMeteoCon.c_str());
+    PRINTF("temp: %f\n", currentWeather.temp);// float temp;
+    PRINTF("pressure: %d\n", currentWeather.pressure); // "pressure": 1013, uint16_t pressure;
+    PRINTF("humidity: %d\n", currentWeather.humidity);// "humidity": 87, uint8_t humidity;
+    PRINTF("tempMin: %f\n", currentWeather.tempMin); //float
+    PRINTF("tempMax: %f\n", currentWeather.tempMax); //float
+    PRINTF("windSpeed: %f\n", currentWeather.windSpeed);// "wind": {"speed": 1.5}, float windSpeed;
+    PRINTF("windDeg: %f\n", currentWeather.windDeg);// "wind": {"deg": 1.5}, float windDeg;
+    PRINTF("clouds: %d\n", currentWeather.clouds);// "clouds": {"all": 90}, uint8_t clouds;
+
     time_t time = currentWeather.observationTime;
-    Serial.printf("observationTime: %d, full date: %s", currentWeather.observationTime, ctime(&time));
-    // "country": "CH", String country;
-    Serial.printf("country: %s\n", currentWeather.country.c_str());
-    // "sunrise": 1526960448, uint32_t sunrise;
+    PRINTF("observationTime: %s", ctime(&time));
     time = currentWeather.sunrise;
-    Serial.printf("sunrise: %d, full date: %s", currentWeather.sunrise, ctime(&time));
-    // "sunset": 1527015901 uint32_t sunset;
+    PRINTF("sunrise: %s", ctime(&time));
     time = currentWeather.sunset;
-    Serial.printf("sunset: %d, full date: %s", currentWeather.sunset, ctime(&time));
+    PRINTF("sunset: %s", ctime(&time));
   
-    // "name": "Zurich", String cityName;
-    Serial.printf("cityName: %s\n", currentWeather.cityName.c_str());
-    Serial.println();
-    Serial.println("---------------------------------------------------/\n");
+   PRINTLN();
+    PRINTLN("---------------------------------------------------/\n");
     
     readyForCurrentWeatherUpdate = false;
   }
 
   void updateServiceData(OLEDDisplay *display) {
-    display->flipScreenVertically();
-    drawProgress(display, 20, "Updating current weather...");
+    if(display->isAwake()){
+      display->flipScreenVertically();
+      drawProgress(display, 20, "Updating current weather...");
+    }
       updateCurrentWeather();
-    
-    drawProgress(display, 50, "Updating forecasts...");
+
+    if(display->isAwake()){
+      drawProgress(display, 50, "Updating forecasts...");
+    }
       forecastClient.setMetric(IS_METRIC);
       forecastClient.setLanguage(OPEN_WEATHER_MAP_LANGUAGE);
       
@@ -390,12 +432,14 @@ void uploadTemperatureHumidity(){
       forecastClient.updateForecasts(forecasts, OPEN_WEATHER_MAP_APP_ID, OPEN_WEATHER_MAP_LOCATION, MAX_FORECASTS);
   
     //drawProgress(display, 90, "Updating thingspeak...");
-      //thingspeak.getLastChannelItem(THINGSPEAK_CHANNEL_ID, THINGSPEAK_API_READ_KEY);
+      //thingspeak.getLastChannelItem(THINGSPEAK_CHANNEL_ID, THINGSPEAK_API_READ);
       
     readyForWeatherServiceUpdate = false;
-    
-    drawProgress(display, 100, "Done...");
-    delay(1000);
+
+    if(display->isAwake()){
+      drawProgress(display, 100, "Done...");
+      delay(1000);
+    }
   }
   
   

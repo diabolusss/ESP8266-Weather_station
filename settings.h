@@ -1,9 +1,24 @@
 #ifndef __SETTINGS_H_
 #define __SETTINGS_H_
 
-#define LV
+#define LV //to identify region
 #define _I2C_OLED //define to load proper lib
-#define OLED_WAKEUP_BTN D1
+#define OLED_WAKEUP_BTN D1 
+#define ABSOLUTE_ZERO_TEMP_C -273 //-273.15
+
+#ifdef DEBUG
+  #define PRINTLN(s)    Serial.println(s)
+  #define PRINT(s)      Serial.print(s)
+  #define PRINTF(s,m)   Serial.printf(s,m)
+  #define PRINTLN2(s,m) Serial.println(s,m)
+  #define PRINT2(s,m)   Serial.print(s,m)
+#else
+  #define PRINTLN(s)    
+  #define PRINT(s)     
+  #define PRINTF(s,m) 
+  #define PRINTLN2(s,m)
+  #define PRINT2(s,m)   
+#endif
 
   //sensor libs
     #include "DHT.h"
@@ -66,7 +81,7 @@
  * WIFI Settings
  **************************/
   //include credentials
-  #include "secret.h"
+  #include "secret.h" //WIFI_SSID, WIFI_PWD
   
   WiFiClient client;
 
@@ -182,40 +197,11 @@
                                                                   //  14bit   6.5ms
 
   ClosedCube_HDC1080 hdc1080;
-
  
-/***************************
- * Begin DHT11 Settings
- **************************/
-  #define DHTPIN 14     // Digital pin connected to the DHT sensor (d5 - gpio14, d4 - gpio2)
-                        // ESP8266-12E  D5 (gpio14) read temperature and Humidity data
-  // Uncomment whatever type you're using!
-  #define DHTTYPE DHT11   // DHT 11
-  //#define DHTTYPE DHT22   // DHT 22  (AM2302), AM2321
-  //#define DHTTYPE DHT21   // DHT 21 (AM2301)
-
-  // Connect pin 1 (on the left) of the sensor to +5V
-  // NOTE: If using a board with 3.3V logic like an Arduino Due connect pin 1
-  // to 3.3V instead of 5V!
-  // Connect pin 2 of the sensor to whatever your DHTPIN is
-  // Connect pin 3 (on the right) of the sensor to GROUND (if your sensor has 3 pins)
-  // Connect pin 4 (on the right) of the sensor to GROUND and leave the pin 3 EMPTY (if your sensor has 4 pins)
-  // Connect a 10K resistor from pin 2 (data) to pin 1 (power) of the sensor
-  //DHT dht(DHTPIN, DHTTYPE);
-  
-  float temp = 0; //temperature
-  int humi = 0; //humidity
-  long readTime = 0; 
-  long uploadTime = 0; 
-  int eCO2 = 0;
-  int etVOC = 0;
-
 /***************************
  * Begin Atmosphere and Light Sensor Settings
  **************************/
-  Adafruit_BMP085 bmp; //has own temperature sensor
-
-  const int Light_ADDR = 0b0100011;   // BH1750FVI: 
+  #define BH1750FVI_I2C_ADDR 0b0100011 // BH1750FVI: 
                                       // Slave Address is 2 types, it is determined by ADDR Terminal
                                       // ADDR = ‘H’ ( ADDR ≧ 0.7VCC ) → “1011100“ -> 0x5c
                                       // ADDR = 'L' ( ADDR ≦ 0.3VCC ) → “0100011“ -> 0x23
@@ -249,17 +235,14 @@
   //#define BH1750FVI_LRES_MODE_CONTINUOUS    0b00010011 //Start measurement at 4lx resolution.
   //#define BH1750FVI_LRES_MODE_ONCE          0b00100011 //Automatically set to Power Down mode after measurement.
                                                        //Measurement Time is typically 16ms
+
   
-  const int Atom_ADDR = 0b1110111;  // BMP180: address:0x77
+  Adafruit_BMP085 bmp; //has own temperature sensor
+  #define BMP180_I2C_ADDR 0b1110111  // BMP180: address:0x77
                                     // The LSB of the device address distinguishes between read (1) and write (0) operation,
                                     //  corresponding to address 0xEF (read) and 0xEE (write).
                                     // read : 0b1110111[1]
                                     // write: 0b1110111[0]
-  int tempLight = 0;
-  int atmPressure = 0;
-  int atmAlt = 0;         // calculate altitude, assuming 'standard' barometric
-                          // pressure of 1013.25 millibar = 101325 Pascal 
-
 
   /***************************
    * Begin Oled display Settings
@@ -288,12 +271,15 @@
     // Initialize the oled display UI
     OLEDDisplayUi   ui( &display );
 
-    bool triggerDisplayWakeup = false; //control display state via btn interrupt
+    //bool triggerDisplayWakeup = true; //control display state via btn interrupt
+    
 /***************************
  * Begin thingspeak.com settings
  ***************************/
-  //@see secret.h for credentials
-  const int httpPort = 80;
+  //@see secret.h for credentials THINGSPEAK_API_WRITE, THINGSPEAK_API_READ
+  #define THINGSPEAK_SERVER "api.thingspeak.com"
+  #define THINGSPEAK_PORT 80              
+  
   #define TS_WRITE_UPDATE_INTERVAL_SEC 60 //sec
                                //max Message update interval limit for home licence 1 upd/sec   
                                //total messages per year 33 million (~90k/day)
@@ -326,11 +312,13 @@
     //service update interval (forecast, time, etc)
     #define FORECAST_UPDATE_INTERVAL_SECS 12*60*60 // Update every 12 hours
     #define CURR_WEATHER_UPDATE_INTERVAL_SECS 20*60 // Update every 20 minutes
+    #define DISPLAY_SLEEP_INTERVAL_SECS 5*60 //put display into sleep after 5 min
     
     Ticker forecastUpdateTicker;
     Ticker weatherUpdateTicker;
     Ticker sensorsReadTicker;
     Ticker sensorsDataUploadTicker;
+    Ticker displaySleepTicker;
     
     // read remote service data; flag changed in the ticker function every UPDATE_INTERVAL_SECS
     bool readyForWeatherServiceUpdate = false;
@@ -343,9 +331,21 @@
     bool readyForSensorDataUpload = false;
    
 /***************************
- * End Settings
+ * End ticker Settings
  **************************/
   time_t now;
+
+  int tempLight = 0;
+  int atmPressure = 0;
+  int atmAlt = 0;         // calculate altitude, assuming 'standard' barometric
+                          // pressure of 1013.25 millibar = 101325 Pascal 
+
+  float temp = ABSOLUTE_ZERO_TEMP_C; //temperature
+  uint8_t humidity = 0; //humidity
+ // long readTime = 0; 
+  //long uploadTime = 0; 
+  int eCO2 = 0;
+  int eTVOC = 0;
   
 /******************************
  * Basic init

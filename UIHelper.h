@@ -3,6 +3,16 @@
 
 #include "settings.h"
 
+#define TOP_OVERLAY
+#define OVERLAY_HEIGHT 14
+#ifdef TOP_OVERLAY
+  #define OVERLAY_Y 0
+  #define correct_y(Y) (OVERLAY_HEIGHT + (Y) )
+#else
+  #define OVERLAY_Y 52
+  #define correct_y(Y) (Y)
+#endif
+
 /******************************
  * UI Prototypes
  *****************************/
@@ -30,10 +40,12 @@
     // this array keeps function pointers to all frames
     // frames are the single views that slide from right to left
     FrameCallback frames[] = { drawIndoor, drawCurrentWeather, drawForecast };
-    int numberOfFrames = 3;
+    uint8_t numberOfFrames = 3;
     
     OverlayCallback overlays[] = { drawHeaderOverlay };
-    int numberOfOverlays = 1;   
+    uint8_t numberOfOverlays = 1;   
+
+    bool isDisplayOn = true; // we start with enabled display
 /******************************
  * End of Basic init
  *****************************/

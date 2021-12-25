@@ -2,7 +2,6 @@
 
   void drawWifiConnecting(OLEDDisplay *display, int counter){
       display->clear();
-      display->flipScreenVertically();
       display->drawString(64, 10, "Connecting to WiFi");
       display->drawXbm(46, 30, 8, 8, counter % 3 == 0 ? activeSymbole : inactiveSymbole);
       display->drawXbm(60, 30, 8, 8, counter % 3 == 1 ? activeSymbole : inactiveSymbole);
@@ -17,7 +16,6 @@
 
   void drawBootWelcome(OLEDDisplay *display, String title) {
     display->clear();
-    display->flipScreenVertically();
     display->setFont(ArialMT_Plain_10);
     display->setTextAlignment(TEXT_ALIGN_CENTER);
     display->setContrast(255);
@@ -28,8 +26,9 @@
   }
   
 void drawProgress(OLEDDisplay *display, int percentage, String label) {
+  if(!display->isAwake()){return;}
+  
   display->clear();
-  //display->flipScreenVertically();
   display->setTextAlignment(TEXT_ALIGN_CENTER);
   display->setFont(ArialMT_Plain_10);
   display->drawString(64, 10, label);
@@ -37,30 +36,36 @@ void drawProgress(OLEDDisplay *display, int percentage, String label) {
   display->display();
 }
 
+/**
+ * ALT H2O LUX
+ * Pressure
+ * TVOC eCO2
+ */
 void drawIndoor(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
-  char FormattedTemperature[10];
+  if(!display->isAwake()){return;}
+   // PRINTF("drawIndoor %d",display->isAwake());
+  
   char FormattedHumidity[10];
   char FormattedAltitude[10];
   
-  display->flipScreenVertically();
   display->setTextAlignment(TEXT_ALIGN_LEFT);
   display->setFont(ArialMT_Plain_10);
   //display->drawString(/*64+*/x, 0, "Indoor Sensors" );
   //display->setFont(ArialMT_Plain_16);
-  
-  dtostrf(temp, 6, 1, FormattedTemperature); //float_value, min_width, num_digits_after_decimal, where_to_store_string
-  display->drawString(x, 8,  "T " + String(FormattedTemperature) + (IS_METRIC ? "°C": "°F"));
-  
-  dtostrf(humi, 6, 1, FormattedHumidity);
-  display->drawString(64+x, 8, "H2O " + String(FormattedHumidity) + " %");
 
-  display->drawString(x, 16, " " + String(atmPressure) + " Pa");
-  display->drawString(64+x, 16, "Alt " + String(atmAlt) + " m");
+  display->drawString(x, correct_y(0), " H2O " + String(humidity) + " %");
+  display->drawString(64+x, correct_y(0), "LUX " + String(tempLight));
+
+  display->drawString(x, correct_y(10), String(atmPressure) + " Pa");
+  display->drawString(64+x, correct_y(10), "ALT " + String(atmAlt) + " m");
   
-  display->drawString(x, 32, "LUX " + String(tempLight));
+  display->drawString(x, correct_y(20), "TVOC " + String(eTVOC));
+  display->drawString(64+x, correct_y(20), "eCO2 " + String(eCO2));
 }
 
 void drawDateTime(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
+  if(!display->isAwake()){return;}
+  
   char time_str[11];
   /*time_t*/ now = time(nullptr);
   struct tm * timeinfo = localtime (&now);
@@ -95,47 +100,57 @@ void drawDateTime(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
 }
 
 void drawCurrentWeather(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
+  if(!display->isAwake()){return;}
+  //  PRINTF("drawCurrentWeather: %d",display->isAwake());
+  
   display->setFont(ArialMT_Plain_10);
   display->setTextAlignment(TEXT_ALIGN_CENTER);
-  display->drawString(64 + x, 38 + y, currentWeather.description);
+  display->drawString(64 + x, correct_y(38), currentWeather.description);
 
   display->setFont(ArialMT_Plain_24);
   display->setTextAlignment(TEXT_ALIGN_LEFT);
-  String temp = String(currentWeather.temp, 1) + (IS_METRIC ? "°C" : "°F");
-  display->drawString(60 + x, 5 + y, temp);
+  String _temp = String(currentWeather.temp, 1) + (IS_METRIC ? "°C" : "°F");
+  display->drawString(60 + x, correct_y(5), _temp);
 
   display->setFont(Meteocons_Plain_36);
   display->setTextAlignment(TEXT_ALIGN_CENTER);
-  display->drawString(32 + x, 0 + y, currentWeather.iconMeteoCon);
+  display->drawString(32 + x, correct_y(0), currentWeather.iconMeteoCon);
 }
 
 
 void drawForecast(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
-  display->flipScreenVertically();
+  if(!display->isAwake()){return;}
+   // PRINTF(" drawForecast: %d",display->isAwake());
+  
   drawForecastDetails(display, x, y, 0);
   drawForecastDetails(display, x + 44, y, 1);
   drawForecastDetails(display, x + 88, y, 2);
 }
 
 void drawForecastDetails(OLEDDisplay *display, int x, int y, int dayIndex) {
+  if(!display->isAwake()){return;}
+  
   time_t observationTimestamp = forecasts[dayIndex].observationTime;
   struct tm* timeInfo;
   timeInfo = localtime(&observationTimestamp);
   display->setTextAlignment(TEXT_ALIGN_CENTER);
   display->setFont(ArialMT_Plain_10);
-  display->drawString(x + 20, y, WDAY_NAMES[timeInfo->tm_wday]);
+  display->drawString(x + 20, correct_y(y), WDAY_NAMES[timeInfo->tm_wday]);
 
   display->setFont(Meteocons_Plain_21);
-  display->drawString(x + 20, y + 12, forecasts[dayIndex].iconMeteoCon);
+  display->drawString(x + 20, correct_y(y) + 12, forecasts[dayIndex].iconMeteoCon);
   String temp = String(forecasts[dayIndex].temp, 0) + (IS_METRIC ? "°C" : "°F");
   display->setFont(ArialMT_Plain_10);
-  display->drawString(x + 20, y + 34, temp);
+  display->drawString(x + 20, correct_y(y) + 34, temp);
   display->setTextAlignment(TEXT_ALIGN_LEFT);
 }
 
 void drawHeaderOverlay(OLEDDisplay *display, OLEDDisplayUiState* state) {
+  if(!display->isAwake()){return;}
+    //PRINTF("drawOverlay: %d",display->isAwake());
+  
   char time_str[11];
-  time_t now = /*dstAdjusted.*/time(nullptr);
+  time_t now = time(nullptr);
   struct tm * timeinfo = localtime (&now);
   
   #ifdef STYLE_24HR
@@ -145,28 +160,30 @@ void drawHeaderOverlay(OLEDDisplay *display, OLEDDisplayUiState* state) {
     sprintf(time_str, "%2d:%02d:%02d%s\n",hour, timeinfo->tm_min, timeinfo->tm_sec, timeinfo->tm_hour>=12?"pm":"am");
   #endif
 
-  display->flipScreenVertically();
   display->setColor(WHITE);
   display->setFont(ArialMT_Plain_10);
   
   display->setTextAlignment(TEXT_ALIGN_LEFT);
-  display->drawString(5, 52, time_str);
-  
-  //display->setTextAlignment(TEXT_ALIGN_RIGHT);
+  display->drawString(5, OVERLAY_Y, time_str);
   
   display->setTextAlignment(TEXT_ALIGN_CENTER);
-  String temp = String(currentWeather.temp, 1) + (IS_METRIC ? "°C" : "°F");
-  //display->drawString(128, 54, temp);
-  display->drawString(101, 52, temp);
+  String _temp = String(currentWeather.temp, 1) + "/" + String(temp, 1) + (IS_METRIC ? "°C" : "°F");
+  display->drawString(90, OVERLAY_Y, _temp);//101
 
+
+  display->setTextAlignment(TEXT_ALIGN_RIGHT);
   int8_t quality = getWifiQuality();
   for (int8_t i = 0; i < 4; i++) {
     for (int8_t j = 0; j < 2 * (i + 1); j++) {
       if (quality > i * 25 || j == 0) {
-        display->setPixel(120 + 2 * i, 61 - j);
+        #ifdef TOP_OVERLAY
+          display->setPixel(120 + 2 * i, OVERLAY_HEIGHT - 4 - j);
+        #else
+          display->setPixel(120 + 2 * i, 61 - j);
+        #endif
       }
     }
   }
 
-  display->drawHorizontalLine(0, 51, 128);
+  display->drawHorizontalLine(0, correct_y(0), display->getWidth());
 }
