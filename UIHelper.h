@@ -16,7 +16,9 @@
 /******************************
  * UI Prototypes
  *****************************/
- 
+  void toggleDisplayState(OLEDDisplay *display, OLEDDisplayUi *ui);
+  void displayOff(OLEDDisplay *display);
+  
   void displayBlank(OLEDDisplay *display);
   
   void drawBootWelcome(OLEDDisplay *display, String title);
@@ -44,8 +46,6 @@
     
     OverlayCallback overlays[] = { drawHeaderOverlay };
     uint8_t numberOfOverlays = 1;   
-
-    bool isDisplayOn = true; // we start with enabled display
 /******************************
  * End of Basic init
  *****************************/

@@ -24,17 +24,15 @@
     #include "DHT.h"
     #include <Adafruit_BMP085.h>
 
-    #ifdef _SPI_OLED
-      #include "SSD1306Spi.h"
-    #elif defined _I2C_OLED
-      #include "SSD1306Wire.h"
+    #ifdef _I2C_OLED
+      #include "src/esp8266-oled-ssd1306/src/SSD1306Wire.h"
+      #include "src/esp8266-oled-ssd1306/src/OLEDDisplayUi.h"
     #endif
 
   //other peripheral libs
     #include "Wire.h"
     #include <ESPWiFi.h>
     #include <ESP8266WiFi.h>
-    #include "OLEDDisplayUi.h"
      
   //service libs
     #include <ESPHTTPClient.h>
@@ -186,7 +184,7 @@
   *  Once it receives a command to trigger a measurement, the HDC1080 moves from sleep mode to measurement mode. 
   *  After completing the measurement the HDC1080 returns to sleep mode.
   */
-  #include "ClosedCube_HDC1080.h"
+  #include "src/ClosedCube_HDC1080/ClosedCube_HDC1080.h"
   #define HDC1080_I2C_ADDR 0x40 
   #define HDC1080_TEMP_RESOLUTION_BITS  HDC1080_RESOLUTION_11BIT  //conversion times:
                                                                   //  11bit   3.65ms
@@ -271,8 +269,6 @@
     // Initialize the oled display UI
     OLEDDisplayUi   ui( &display );
 
-    //bool triggerDisplayWakeup = true; //control display state via btn interrupt
-    
 /***************************
  * Begin thingspeak.com settings
  ***************************/
@@ -333,26 +329,25 @@
 /***************************
  * End ticker Settings
  **************************/
+  
+/******************************
+ * Basic init
+ *****************************/
+  unsigned long lastDebounceTime = 0;  // the last time the output pin was toggled
+  #define BTN_DEBOUNCE_DELAY_MS 50 //delay to filter btn chattering phenomenon
+
   time_t now;
 
-  int tempLight = 0;
-  int atmPressure = 0;
+  unsigned int tempLight = 0;
+  unsigned int atmPressure = 0;
   int atmAlt = 0;         // calculate altitude, assuming 'standard' barometric
                           // pressure of 1013.25 millibar = 101325 Pascal 
 
   float temp = ABSOLUTE_ZERO_TEMP_C; //temperature
   uint8_t humidity = 0; //humidity
- // long readTime = 0; 
-  //long uploadTime = 0; 
-  int eCO2 = 0;
-  int eTVOC = 0;
+  unsigned int eCO2 = 0;
+  unsigned int eTVOC = 0;
   
-/******************************
- * Basic init
- *****************************/
-  //String lastUpdate = "--";
-  //long timeSinceLastWUpdate = 0;
-
 /******************************
  * Sensor Prototypes
  *****************************/

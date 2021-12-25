@@ -1,5 +1,28 @@
 #include "UIHelper.h"
 
+  void toggleDisplayState(OLEDDisplay *display, OLEDDisplayUi *ui){
+    if(display->isAwake()){
+      ui->disableAutoTransition();
+      display->displayOff();
+      
+      displaySleepTicker.detach();
+      
+    }else{
+      display->displayOn();
+      ui->enableAutoTransition();
+      
+      displaySleepTicker.attach(DISPLAY_SLEEP_INTERVAL_SECS, displayOff, display);
+    }
+  }
+
+  void displayOff(OLEDDisplay *display){
+    if(display->isAwake()){
+      ui.disableAutoTransition();
+      display->displayOff();
+      displaySleepTicker.detach();
+    }
+  }
+  
   void drawWifiConnecting(OLEDDisplay *display, int counter){
       display->clear();
       display->drawString(64, 10, "Connecting to WiFi");

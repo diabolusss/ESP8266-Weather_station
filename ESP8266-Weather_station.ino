@@ -1,7 +1,6 @@
-#define DEBUG
+//#define DEBUG
 #include "settings.h"
 #include "UIHelper.h"
-
 
 /******************************
  * Begin Service Prototypes
@@ -14,21 +13,15 @@
  *****************************/
  
  ICACHE_RAM_ATTR void btnPressedISR() {
+    //filter button chattering phenomenon
+    if ((millis() - lastDebounceTime) < BTN_DEBOUNCE_DELAY_MS) { return;}
+    // reset the debouncing timer
+    else { lastDebounceTime = millis();}
+    
     PRINTF("BTN pressed!!! %d",display.isAwake());
-    if(display.isAwake()){
-      display.displayOff();
-      //triggerDisplayWakeup = false;
-      isDisplayOn = false;
-      
-      displaySleepTicker.detach();
-    }else{
-      display.displayOn();
-      //triggerDisplayWakeup = true;
-      isDisplayOn = true;
-      displaySleepTicker.attach(DISPLAY_SLEEP_INTERVAL_SECS, displayOff);
-    }
-  }
-
+    toggleDisplayState(&display, &ui);
+ }
+  
 void setup() {
   pinMode(OLED_WAKEUP_BTN, INPUT);
   
@@ -36,14 +29,16 @@ void setup() {
   //  CHANGE: to trigger the interrupt whenever the pin changes value – for example from HIGH to LOW or LOW to HIGH;
   //  FALLING: for when the pin goes from HIGH to LOW;
   //  RISING: to trigger when the pin goes from LOW to HIGH.
+  // NB digitalRead in ISR is useless for !CHANGE mode
   attachInterrupt(digitalPinToInterrupt(OLED_WAKEUP_BTN), btnPressedISR, RISING);
 
-  // Serial port for debugging purposes
-  Serial.begin(115200);
+  #ifdef DEBUG
+    // Serial port for debugging purposes
+    Serial.begin(115200);
+    delay(1000); //timeout to make serial come up
+  #endif
 
   Wire.begin(SDA_PIN, SDC_PIN);
-
-  delay(1000); //timeout to make serial come up
 
   //This begins the CCS811 sensor and prints error status of .beginWithStatus()
   CCS811Core::CCS811_Status_e returnCode = MCU811b.beginWithStatus();
@@ -51,7 +46,9 @@ void setup() {
     PRINTLN(MCU811b.statusString(returnCode));
 
   {
-    hdc1080.begin(HDC1080_I2C_ADDR);
+    
+    hdc1080.begin(HDC1080_I2C_ADDR, HDC1080_HUMID_RESOLUTION_BITS, HDC1080_TEMP_RESOLUTION_BITS);
+      
       PRINT("Manufacturer ID=0x");
       PRINTLN2(hdc1080.readManufacturerId(), HEX); // 0x5449 ID of Texas Instruments
       PRINT("Device ID=0x");
@@ -62,12 +59,11 @@ void setup() {
       sprintf(format, "%02X-%04X-%04X", sernum.serialFirst, sernum.serialMid, sernum.serialLast);
       PRINTLN(format);
       
-    hdc1080.setResolution(HDC1080_TEMP_RESOLUTION_BITS, HDC1080_HUMID_RESOLUTION_BITS);
-    delay(10);
-    
-    //WRONG!!!
-    //14:51:24.915 -> Measurement Resolution: T=0 (0=14 bit, 1=11 bit) RH=1 (00=14 bit, 01=11 bit, 10=8 bit)
     HDC1080_Registers reg = hdc1080.readRegister();
+      //by default:
+      //  heater disabled
+      //  T or RH is acquired in separate calls
+      //T res 14b & H res 14b
       PRINT("Measurement Resolution: T=");
       PRINT2(reg.TemperatureMeasurementResolution, BIN);
       PRINT(" (0=14 bit, 1=11 bit)");
@@ -164,14 +160,7 @@ void setup() {
   sensorsDataUploadTicker.attach(TS_WRITE_UPDATE_INTERVAL_SEC,    setReadyForSensorDataUpload);
   sensorsReadTicker.attach(5,                                     setReadyForSensorsRead);
 
-  displaySleepTicker.attach(DISPLAY_SLEEP_INTERVAL_SECS, displayOff);
-}
-
-void displayOff(){
-  if(display.isAwake()){
-    display.displayOff();
-    displaySleepTicker.detach();
-  }
+  displaySleepTicker.attach(DISPLAY_SLEEP_INTERVAL_SECS, displayOff, (OLEDDisplay *)&display);
 }
 
 void loop() {  
@@ -198,7 +187,7 @@ void loop() {
     updateCurrentWeather();
   }
   
-  if(readyForWeatherServiceUpdate && isDisplayOn && ui.getUiState()->frameState == FIXED) {
+  if(readyForWeatherServiceUpdate && display.isAwake() && ui.getUiState()->frameState == FIXED) {
     updateServiceData(&display);
   }
 
@@ -268,10 +257,15 @@ void printSensorError()
 
 //read temperature humidity data
 void readTemperatureHumidity(){
-  humidity = hdc1080.readHumidity();
-  PRINT("hdc1080 T=");
-  PRINT(hdc1080.readTemperature()); //dont use it, as CCS811 introduces heat dissipation error
-  PRINT("C, RH=");
+  //hdc1080.readTemperature()); //dont use it, as CCS811 introduces heat dissipation error
+  temp = bmp.readTemperature();
+  PRINT("Temperature = ");
+  PRINT(temp);
+  PRINTLN(" *C");
+
+  humidity = hdc1080.readHumidity(); //The result of the acquisition is always a 14 bit value,
+                                     //  while the accuracy is related to the selected conversion time
+  PRINT("Humidity=");
   PRINT(humidity);
   PRINTLN("%");
 }
@@ -313,12 +307,6 @@ void readAtmosphere(){
   PRINT(atmPressure);
   PRINTLN(" Pascal");
 
-  float tempAtm = bmp.readTemperature();
-  temp = tempAtm;
-  PRINT("Temperature = ");
-  PRINT(tempAtm);
-  PRINTLN(" *C");
-        
   // Calculate altitude assuming 'standard' barometric
   // pressure of 1013.25 millibar = 101325 Pascal
   float tempAlt = bmp.readAltitude();
