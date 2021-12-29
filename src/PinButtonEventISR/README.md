@@ -25,9 +25,9 @@ Connect a switch (or use a piece of wire) between pin 5 and ground (GND).
 # Documentation
 
 All classes and public methods are documented in the source code of the library:
-* [PinButtonEventISR.h]()
-* [ButtonEventHandler.h]()
-* [ButtonEventHandler.cpp]()
+* [PinButtonEventISR.h](https://github.com/diabolusss/ESP8266-Weather_station/blob/main/src/PinButtonEventISR/src/PinButtonEventISR.h)
+* [ButtonEventHandler.h](https://github.com/diabolusss/ESP8266-Weather_station/blob/main/src/PinButtonEventISR/src/ButtonEventHandler.h)
+* [ButtonEventHandler.cpp](https://github.com/diabolusss/ESP8266-Weather_station/blob/main/src/PinButtonEventISR/src/ButtonEventHandler.cpp)
 
 # Changelog
 

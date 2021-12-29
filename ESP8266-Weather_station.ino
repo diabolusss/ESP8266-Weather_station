@@ -179,7 +179,7 @@ void loop() {
   //handle button event
   if(D7Button.hasEvent()){
     if(D7Button.isLongPress()){
-      PRINTLN("LONG PRESS");
+      storeCCS811Baseline();
       
     }else if(D7Button.isPress()){
       PRINTLN("PRESS");
@@ -189,7 +189,6 @@ void loop() {
         PRINTLN("DBL CLICK");
         
       }else if(D7Button.isSingleClick()){
-        //PRINTLN("SNGL CLICK");
         toggleDisplayState(&display, &ui);
       }
     }
@@ -232,6 +231,33 @@ void readCCS811b(){
       printSensorError();
     #endif
   }
+}
+
+/**
+ *  Store CCS811 baseline into eeprom.
+ *  To use, wait until the sensor is burned in, warmed up, and in clean air.  Then,  
+ *   save the baseline to EEPROM.  
+ *  Aftewards, the sensor can be powered up in dirty air and the baseline should be 
+ *   restored to the CCS811 to help the sensor stablize faster.
+ *   
+ *   EEPROM memory usage:
+ *  addr: data  
+ *  ----------  
+ *  0x00: 0xA5  
+ *  0x01: 0xB2  
+ *  0x02: 0xnn  
+ *  0x03: 0xmm
+ *  
+ *    0xA5B2 is written as an indicator that 0x02 and 0x03 contain a valid number.
+ *    0xnnmm is the saved data.
+ */
+void storeCCS811Baseline(){
+  const uint16_t baseline = MCU811b.getBaseline();
+  PRINT("CCS811 >>> storing baseline 0x");
+  PRINTLN2(baseline, HEX);
+  #ifdef CCS811_STORE_BASELINE
+    eepromStoreBaseline(baseline);
+  #endif
 }
 
 //read temperature humidity data

@@ -167,7 +167,7 @@
   *   and Boston fern for removing chemicals and biological compounds.
   *   https://cdn.sparkfun.com/assets/learn_tutorials/1/4/3/ECA_Report19.pdf
   */
-  #include "SparkFunCCS811.h" //Click here to get the library: http://librarymanager/All#SparkFun_CCS811
+  #include "src/SparkFun_CCS811_Arduino_Library/src/SparkFunCCS811.h" //Click here to get the library: http://librarymanager/All#SparkFun_CCS811
   
   //#define CCS811_ADDR 0x5B //2nd I2C Address (HIGH)
   #define CCS811_ADDR 0x5A //1st I2C Address (LOW)

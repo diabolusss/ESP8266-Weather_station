@@ -19,16 +19,20 @@ esp8266, cjmcu8118+hdc1080, bmp180, ccs811, gy30, ssd1306 oled
   - check ccs811 firmware version and upgrade if needed
   - save/restore ccs811 baseline to/from EEPROM. (save onClick & by timer - how often?)
   - lower sensor reading frequency based on inactivity time
+  - add forecast day/night temperatures
+  - add more details for current weather data
   
 # Custom libraries and changes 
  * PinButtonEventISR
    - static library to use with button interrupts. Handles debounced clicks (single, double) and press (short, long) events.
    
+ * SparkFun_CCS811_Arduino_Library
+   - read firmware, bootloader, application versions ([ported from](https://github.com/maarten-pennings/CCS811))
+   
  * esp8266-oled-ssd1306
   #211229
    - added resetState method to reset timers and move to the first frame
    - dont draw abything if display is not awake
-   
   #211225
    - added isAwake display status flag to avoid rendering when display is off
  
