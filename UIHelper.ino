@@ -5,9 +5,12 @@
       ui->disableAutoTransition();
       display->displayOff();
       
+      //maybe free buffers, too?
+      
       displaySleepTicker.detach();
       
     }else{
+      ui->resetState(); //reset timers and render first frame
       display->displayOn();
       ui->enableAutoTransition();
       
@@ -30,11 +33,6 @@
       display->drawXbm(60, 30, 8, 8, counter % 3 == 1 ? activeSymbole : inactiveSymbole);
       display->drawXbm(74, 30, 8, 8, counter % 3 == 2 ? activeSymbole : inactiveSymbole);
       display->display();
-  }
-
-  void displayBlank(OLEDDisplay *display){
-    display->clear();
-    display->display();
   }
 
   void drawBootWelcome(OLEDDisplay *display, String title) {

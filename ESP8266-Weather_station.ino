@@ -1,4 +1,5 @@
-//#define DEBUG
+#define DEBUG
+//#define CCS811_STORE_BASELINE
 #include "settings.h"
 #include "UIHelper.h"
 
@@ -12,26 +13,7 @@
  * End of Service Prototypes
  *****************************/
  
- ICACHE_RAM_ATTR void btnPressedISR() {
-    //filter button chattering phenomenon
-    if ((millis() - lastDebounceTime) < BTN_DEBOUNCE_DELAY_MS) { return;}
-    // reset the debouncing timer
-    else { lastDebounceTime = millis();}
-    
-    PRINTF("BTN pressed!!! %d",display.isAwake());
-    toggleDisplayState(&display, &ui);
- }
-  
 void setup() {
-  pinMode(OLED_WAKEUP_BTN, INPUT);
-  
-  // Set button pin as interrupt, to wakeup display (power on)
-  //  CHANGE: to trigger the interrupt whenever the pin changes value – for example from HIGH to LOW or LOW to HIGH;
-  //  FALLING: for when the pin goes from HIGH to LOW;
-  //  RISING: to trigger when the pin goes from LOW to HIGH.
-  // NB digitalRead in ISR is useless for !CHANGE mode
-  attachInterrupt(digitalPinToInterrupt(OLED_WAKEUP_BTN), btnPressedISR, RISING);
-
   #ifdef DEBUG
     // Serial port for debugging purposes
     Serial.begin(115200);
@@ -40,20 +22,41 @@ void setup() {
 
   Wire.begin(SDA_PIN, SDC_PIN);
 
-  //This begins the CCS811 sensor and prints error status of .beginWithStatus()
-  CCS811Core::CCS811_Status_e returnCode = MCU811b.beginWithStatus();
-    PRINT("CCS811 begin exited with: ");
-    PRINTLN(MCU811b.statusString(returnCode));
-
   {
-    
-    hdc1080.begin(HDC1080_I2C_ADDR, HDC1080_HUMID_RESOLUTION_BITS, HDC1080_TEMP_RESOLUTION_BITS);
+    //This begins the CCS811 sensor and prints error status of .beginWithStatus()
+    CCS811Core::CCS811_Status_e status = MCU811b.beginWithStatus();
+      PRINT("CCS811 >>> begin status ");
+      PRINTLN(MCU811b.statusString(status));
+
+      //#todo retrieve firmware data
       
-      PRINT("Manufacturer ID=0x");
+    if(status == CCS811Core::CCS811_Stat_SUCCESS){ //restore baseline if available
+      
+      #ifdef CCS811_STORE_BASELINE
+        uint16_t baseline = eepromGetBaseline();
+        if(baseline > 0 && baseline != 255){
+           PRINT("CCS811 >>> Applying retrieved baseline 0x");
+           PRINTLN2(baseline, HEX);
+           status = MCU811b.setBaseline(baseline);
+           
+           PRINT("CCS811 >>> Baseline set status ");
+           PRINTLN(MCU811b.statusString(status));
+        }else{
+           PRINTLN("EEPROM >>> Missing CCS811 baseline data.");
+        }
+      #endif
+      
+    }
+  }
+
+  {//prepare hdc1080
+    hdc1080.begin(HDC1080_I2C_ADDR, HDC1080_HUMID_RESOLUTION_BITS, HDC1080_TEMP_RESOLUTION_BITS);
+      PRINTLN("HDC1080 >>> found");
+      PRINT("  Manufacturer ID=0x");
       PRINTLN2(hdc1080.readManufacturerId(), HEX); // 0x5449 ID of Texas Instruments
-      PRINT("Device ID=0x");
+      PRINT("  Device ID=0x");
       PRINTLN2(hdc1080.readDeviceId(), HEX); // 0x1050 ID of the device
-      PRINT("Device Serial Number=");
+      PRINT("  Device Serial Number=");
       HDC1080_SerialNumber sernum = hdc1080.readSerialNumber();
       char format[12];
       sprintf(format, "%02X-%04X-%04X", sernum.serialFirst, sernum.serialMid, sernum.serialLast);
@@ -64,39 +67,38 @@ void setup() {
       //  heater disabled
       //  T or RH is acquired in separate calls
       //T res 14b & H res 14b
-      PRINT("Measurement Resolution: T=");
+      PRINT("  Measurement Resolution: T=");
       PRINT2(reg.TemperatureMeasurementResolution, BIN);
       PRINT(" (0=14 bit, 1=11 bit)");
     
-      PRINT(" RH=");
+      PRINT("  RH=");
       PRINT2(reg.HumidityMeasurementResolution, BIN);
       PRINTLN(" (00=14 bit, 01=11 bit, 10=8 bit)");
 
-      PRINT("Software reset bit: ");
+      PRINT("  Software reset bit: ");
       PRINT2(reg.SoftwareReset, BIN);
       PRINTLN(" (0=Normal Operation, 1=Software Reset)");
     
-      PRINT("Heater: ");
+      PRINT("  Heater: ");
       PRINT2(reg.Heater, BIN);
       PRINTLN(" (0=Disabled, 1=Enabled)");
     
-      PRINT("Mode of Acquisition: ");
+      PRINT("  Mode of Acquisition: ");
       PRINT2(reg.ModeOfAcquisition, BIN);
       PRINTLN(" (0=T or RH is acquired, 1=T and RH are acquired in sequence, T first)");
     
-      PRINT("Battery Status: ");
+      PRINT("  Battery Status: ");
       PRINT2(reg.BatteryStatus, BIN);
       PRINTLN(" (0=Battery voltage > 2.8V, 1=Battery voltage < 2.8V)");
-
-  }
+  }//end of prepare HDC1080
 
   {
     Wire.beginTransmission(BMP180_I2C_ADDR);
     //initialize Atmosphere sensor
     if (!bmp.begin()) {
-      PRINTLN("Could not find BMP180 or BMP085 sensor at 0x77");
+      PRINTLN("BMP180 >>> Sensor missing");
     }else{
-      PRINTLN("Found BMP180 or BMP085 sensor at 0x77");
+      PRINTLN("BMP180 >>> ready");
     }
     Wire.endTransmission();
   }
@@ -106,43 +108,30 @@ void setup() {
     Wire.write(BH1750FVI_POWERON);
   Wire.endTransmission();
 
-  // initialize display
-  display.init();
+  {
+    ui.setTargetFPS(25); //updateInterval = 1/fps * 1000 = 40 ms
+    ui.setTimePerFrame(10*1000); // 10s per frame; ticksPerFrame = time / updateInterval = 250
+    
+    ui.disableAllIndicators();
   
-  displayBlank(&display);
-  
-  display.flipScreenVertically();
+    // You can change the transition that is used
+    // SLIDE_LEFT, SLIDE_RIGHT, SLIDE_TOP, SLIDE_DOWN
+    ui.setFrameAnimation(SLIDE_LEFT);
+    ui.setFrames(frames, numberOfFrames);
+    ui.setOverlays(overlays, numberOfOverlays);
+    
+    // UI.init takes care of display.init()
+    ui.init();
+
+    //directly writes to a register, so call it only after initialization
+    display.flipScreenVertically();
+    display.setBrightness(32);
+    
+    PRINTLN("OLED >>> Display & UI ready.");
+  }
 
   drawBootWelcome(&display, "Weather Station");
-
-  connectWifi();
-  
-  ui.setTargetFPS(30);
-  ui.setTimePerFrame(10*1000); // Setup frame display time to 10 sec
-  
-  //Hack until disableIndicator works:
-  //Set an empty symbol
-  ui.setActiveSymbol(emptySymbol);
-  ui.setInactiveSymbol(emptySymbol);
-  
-  ui.disableIndicator();
-
-  // You can change the transition that is used
-  // SLIDE_LEFT, SLIDE_RIGHT, SLIDE_TOP, SLIDE_DOWN
-  ui.setFrameAnimation(SLIDE_LEFT);
-  ui.setFrames(frames, numberOfFrames);
-  ui.setOverlays(overlays, numberOfOverlays);
-  
-  // You can change this to
-  // TOP, LEFT, BOTTOM, RIGHT
-  ui.setIndicatorPosition(BOTTOM);
-  // Defines where the first frame is located in the bar.
-  ui.setIndicatorDirection(LEFT_RIGHT);
-  
-  
-  // Inital UI takes care of initalising the display too.
-  ui.init();
-  PRINTLN("");
+  connectWifi(&display);
   
   while (!client.connect(THINGSPEAK_SERVER, THINGSPEAK_PORT)) {
     PRINTLN("Connection to thingspeak Failed");
@@ -186,72 +175,62 @@ void loop() {
   if(readyForCurrentWeatherUpdate) {
     updateCurrentWeather();
   }
-  
+
+  //handle button event
+  if(D7Button.hasEvent()){
+    if(D7Button.isLongPress()){
+      PRINTLN("LONG PRESS");
+      
+    }else if(D7Button.isPress()){
+      PRINTLN("PRESS");
+      
+    }else if(D7Button.isClick()){
+      if(D7Button.isDoubleClick()){
+        PRINTLN("DBL CLICK");
+        
+      }else if(D7Button.isSingleClick()){
+        //PRINTLN("SNGL CLICK");
+        toggleDisplayState(&display, &ui);
+      }
+    }
+  }//end of handle button event
+    
   if(readyForWeatherServiceUpdate && display.isAwake() && ui.getUiState()->frameState == FIXED) {
     updateServiceData(&display);
   }
 
-  int remainingTimeBudget = ui.update();
-
-  if (remainingTimeBudget > 0) {
-    // You can do some work here
-    // Don't do stuff if you are below your
-    // time budget.
-    delay(remainingTimeBudget);
+  if(display.isAwake()){//if display is off, then skip ui handling
+    int remainingTimeBudget = ui.update();
+  
+    if (remainingTimeBudget > 0) {
+      // You can do some work here
+      // Don't do stuff if you are below your
+      // time budget.
+      delay(remainingTimeBudget);
+    }
   }
 }
 
-//todo use interrupt to avoid calling dataAvailable
 void readCCS811b(){
-   //Check to see if data is ready with .dataAvailable()
+  //retrieve data only if it's available
+  //todo use interrupt to avoid calling dataAvailable
   if (MCU811b.dataAvailable())  {
-    //If so, have the sensor read and calculate the results.
-    //Get them later
     MCU811b.readAlgorithmResults();
 
     eCO2 = MCU811b.getCO2();
     eTVOC = MCU811b.getTVOC();
     
     PRINT("CO2[");
-    //Returns calculated CO2 reading
-    PRINT(eCO2);
+    PRINT(eCO2); //calculated CO2 reading
     PRINT("] tVOC[");
-    //Returns calculated TVOC reading
-    PRINT(eTVOC);
+    PRINT(eTVOC); //calculated TVOC reading
     PRINT("]");
     PRINTLN();
     
   } else if (MCU811b.checkForStatusError())  {
-    printSensorError();
-  }
-}
-
-//printSensorError gets, clears, then prints the errors
-//saved within the error register.
-void printSensorError()
-{
-  uint8_t error = MCU811b.getErrorRegister();
-
-  if (error == 0xFF) //comm error
-  {
-    PRINTLN("Failed to get ERROR_ID register.");
-  }
-  else
-  {
-    PRINT("Error: ");
-    if (error & 1 << 5)
-      PRINT("HeaterSupply");
-    if (error & 1 << 4)
-      PRINT("HeaterFault");
-    if (error & 1 << 3)
-      PRINT("MaxResistance");
-    if (error & 1 << 2)
-      PRINT("MeasModeInvalid");
-    if (error & 1 << 1)
-      PRINT("ReadRegInvalid");
-    if (error & 1 << 0)
-      PRINT("MsgInvalid");
-    PRINTLN();
+    #ifdef DEBUG
+      printSensorError();
+    #endif
   }
 }
 
@@ -404,7 +383,6 @@ void uploadTemperatureHumidity(){
 
   void updateServiceData(OLEDDisplay *display) {
     if(display->isAwake()){
-      display->flipScreenVertically();
       drawProgress(display, 20, "Updating current weather...");
     }
       updateCurrentWeather();
@@ -429,7 +407,36 @@ void uploadTemperatureHumidity(){
       delay(1000);
     }
   }
+
+#ifdef DEBUG
+  /**
+   * gets, clears, then prints the errors
+   *  saved within the error register.
+  */
+  void printSensorError(){
+    uint8_t error = MCU811b.getErrorRegister();
   
+    if (error == 0xFF){ //comm error
+      PRINTLN("Failed to get ERROR_ID register.");
+      
+    }  else  {
+      PRINT("Error: ");
+      if (error & 1 << 5)
+        PRINT("HeaterSupply");
+      if (error & 1 << 4)
+        PRINT("HeaterFault");
+      if (error & 1 << 3)
+        PRINT("MaxResistance");
+      if (error & 1 << 2)
+        PRINT("MeasModeInvalid");
+      if (error & 1 << 1)
+        PRINT("ReadRegInvalid");
+      if (error & 1 << 0)
+        PRINT("MsgInvalid");
+      PRINTLN();
+    }
+  }
+#endif
   
   
   

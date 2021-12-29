@@ -41,6 +41,13 @@
     #include "OpenWeatherMapForecast.h"
 
   //system libs
+    #ifdef CCS811_STORE_BASELINE
+     // #define _EEPROM
+      #include <EEPROM.h>
+      #define EEPROM_BASELINE_START_1B 0xA5
+      #define EEPROM_BASELINE_START_2B 0xB2
+    #endif
+    
     #include <time.h>                       // time() ctime()
     #include <sys/time.h>                   // struct timeval
     
@@ -50,30 +57,22 @@
     #include "WeatherStationFonts.h"
     #include "WeatherStationImages.h"
 
+/***************************
+ * Interrupt driven events
+ **************************/
+  #include "src/PinButtonEventISR/src/PinButtonEventISR.h"
+  //#define BUTTON_NORMALLY_CLOSED  
+  PinButtonEventISR D7Button(OLED_WAKEUP_BTN);
 
 /***************************
  * Time Settings
  **************************/
   #define STYLE_24HR
-  //#include <simpleDSTadjust.h>
   #include <TZ.h>
   #ifdef LV
     #define MYTZ TZ_Europe_Riga
-    #define NTP_SERVERS "0.lv.pool.ntp.org", "1.lv.pool.ntp.org", "2.lv.pool.ntp.org"//, "3.lv.pool.ntp.org"
-    #define UTC_OFFSET +2
-    
-    //struct dstRule StartRule = {"EEST", Last, Sun, Mar, 28, 3600}; // Eastern European Summer Time = UTC/GMT +1 hours
-    //struct dstRule EndRule = {"EET", Last, Sun, Oct, 31, 0};       // Eastern European Time = UTC/GMT +2 hour
+    //#define NTP_SERVERS "0.lv.pool.ntp.org", "1.lv.pool.ntp.org", "2.lv.pool.ntp.org"
   #endif
-
-  // Setup simpleDSTadjust Library rules
-  //simpleDSTadjust dstAdjusted(StartRule, EndRule);
-  
-  /*#define TZ              2       // (utc+) TZ in hours
-  #define DST_MN          60      // use 60mn for summer time in some countries
-  #define TZ_MN           ((TZ)*60)
-  #define TZ_SEC          ((TZ)*3600)
-  #define DST_SEC         ((DST_MN)*60)*/
 
 /***************************
  * WIFI Settings
@@ -87,7 +86,24 @@
  * Begin CCS811 Settings
  **************************/
  /*
-  * save baseline to eprom(flash): https://pastebin.com/KGigYPr6
+  * #TODO save baseline to eeprom(flash) by push button and by timer (every 12h?): https://pastebin.com/KGigYPr6
+  * 
+  * NB! the sensor is insensitive for CO2. The trick is that the CO2 reading assumes the sensor is inside a building 
+  *   (iAQ - indoor air quality), and that humans are the (only) producer of CO2. 
+  *   So the gas sensor measures VOCs, assumes they are from humans, maps that to the amount of humans, 
+  *   and then maps that to the CO2 they would produce. Thus, TVOC and CO2 correlate.
+  *   
+  *   "metal oxide sensors do not give absolute readings". Yes they pretend with their CO2 and TVOC registers, but they don't. 
+  *   They measure the resistance of their metal oxide layer, and then check how much that deviates from normal resistance, 
+  *     and that deviation maps to a CO2/TVOC readout. The problem is with this normal resistance, quoting the data sheet again 
+  *     "The resistance RS varies from sensor to sensor (manufacturing variation), from use-case to use-case, and over time." 
+  *   Bottom line, all sensors give a different CO2/TVOC reading, but when it goes up it at least we know air got worse.
+  *   
+  * NB clean (normal) air resistance varies: "To mitigate this problem, the output of the sensor is normalized: 
+  *     RS is divided by RA. The value of RA is known as the baseline. RA cannot be determined by a one-time calibration; 
+  *     it is maintained on-the-fly in software". By power cycling, you effectively remove the clean air knowledge built up 
+  *     by the sensor: if you power a sensor on in bad air, it only has that as a reference and considers that as clean.
+  *   
   * VOCs detected 
   *   Alcohols, Aldehydes, Ketones, Organic Acids, Amines, Aliphatic and Aromatic Hydrocarbons
   * Cross sensitivity 
@@ -100,6 +116,7 @@
   *   The equivalent Total Volatile Organic Compound (eTVOC)
   *   output range for CCS811 is from 0ppb up to 29206ppb.
   *   
+  *****************************************************************************
   * CO2
   *   250-400ppm  Normal background concentration in outdoor ambient air
   *   400-1,000ppm  Concentrations typical of occupied indoor spaces with good air exchange
@@ -166,6 +183,7 @@
    *      default value must be written to the register corresponding to the unsupported environment
    *      parameter. The user must not write zero to the unsupported temperature or humidity field of the ENV_DATA register.
    */
+   
 /***************************
  * Begin HDC1080 Settings
  **************************/
@@ -176,6 +194,9 @@
   *     and a final temperature reading (after letting the sensor warm up). 
   *     Then subtract this value from `BMEtempC` to ensure the proper calibration is taking place.
   *     
+  * TODO# One of the solution is to disable heating (???) for CCS811 by set ccs811.setDriveMode(CCS811_DRIVE_MODE_IDLE); 
+  *       after measure, you will see how values of HDC1080 slowly returning to normal.
+  * 
   * The HDC1080 has two modes of operation: 
   *   - sleep mode  
   *   - measurement mode. 
@@ -263,11 +284,12 @@
       #endif
       
       // Initialize the oled display for address 0x3c
-      SSD1306Wire     display(I2C_DISPLAY_ADDRESS, SDA_PIN, SDC_PIN);
+      //128x64 by default
+      SSD1306Wire     display(I2C_DISPLAY_ADDRESS, SDA_PIN, SDC_PIN, GEOMETRY_128_64);
     #endif
     
     // Initialize the oled display UI
-    OLEDDisplayUi   ui( &display );
+    OLEDDisplayUi   ui(&display);
 
 /***************************
  * Begin thingspeak.com settings
@@ -347,6 +369,12 @@
   uint8_t humidity = 0; //humidity
   unsigned int eCO2 = 0;
   unsigned int eTVOC = 0;
+
+/******************************
+ * EEPROM Prototypes
+ *****************************/
+  uint16_t eepromGetBaseline();
+  uint16_t eepromStoreBaseline(uint16_t baseline);
   
 /******************************
  * Sensor Prototypes

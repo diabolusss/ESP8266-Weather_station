@@ -161,9 +161,12 @@ class OLEDDisplayUi {
     void                drawFrame();
     void                drawOverlays();
     void                tick();
-    void                resetState();
 
   public:
+    /**
+     * Reset animation timers to initial state and move to the first frame
+     */
+    void resetState();
 
     OLEDDisplayUi(OLEDDisplay *display);
 

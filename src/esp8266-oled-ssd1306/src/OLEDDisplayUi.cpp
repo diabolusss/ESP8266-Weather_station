@@ -39,13 +39,13 @@ void OLEDDisplayUi::init() {
 }
 
 void OLEDDisplayUi::setTargetFPS(uint8_t fps){
-  float oldInterval = this->updateInterval;
-  this->updateInterval = ((float) 1.0 / (float) fps) * 1000;
+  float oldInterval = this->updateInterval; //33us by default
+  this->updateInterval = ((float) 1000.0 / (float) fps);
 
   // Calculate new ticksPerFrame
   float changeRatio = oldInterval / (float) this->updateInterval;
-  this->ticksPerFrame *= changeRatio;
-  this->ticksPerTransition *= changeRatio;
+  this->ticksPerFrame *= changeRatio; // ~5s per frame
+  this->ticksPerTransition *= changeRatio; // ~0.5s per frame
 }
 
 // -/------ Automatic controll ------\-
@@ -252,6 +252,8 @@ void OLEDDisplayUi::resetState() {
 }
 
 void OLEDDisplayUi::drawFrame(){
+  if(!this->display->isAwake()){ return;}
+  
   switch (this->state.frameState){
      case IN_TRANSITION: {
        float progress = (float) this->state.ticksSinceLastStateSwitch / (float) this->ticksPerTransition;
