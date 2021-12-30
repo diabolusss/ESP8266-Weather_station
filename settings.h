@@ -42,10 +42,29 @@
 
   //system libs
     #ifdef CCS811_STORE_BASELINE
-     // #define _EEPROM
-      #include <EEPROM.h>
+      #define _EEPROM_
+    #endif
+
+    #ifdef _EEPROM_
+      /**
+       * Due to the nature of this flash memory (NOR) a full sector erase must be done prior to write any new data. 
+       * If a power failure (intended or not) happens during this process the sector data is lost.
+       * Also, writing data to a NOR memory can be done byte by byte but only to change a 1 to a 0. 
+       * The only way to turn 0s to 1s is to perform a sector erase which turns all memory positions in that sector to 1. 
+       * But sector erasing must be done in full sectors, thus wearing out the flash memory faster.
+       * 
+       * Ro overcome this use sector rotation.
+       */
+      #define NO_GLOBAL_EEPROM
+      #include <EEPROM_Rotate.h>
+      
       #define EEPROM_BASELINE_START_1B 0xA5
       #define EEPROM_BASELINE_START_2B 0xB2
+      
+      #define EEPROM_SECTOR_POOL_COUNT 4 //use 4 sectors in pool
+      #define EEPROM_SECTOR_POOL_SIZE 4096 //1 sector size
+      
+      EEPROM_Rotate EEPROMPool;
     #endif
     
     #include <time.h>                       // time() ctime()
@@ -167,7 +186,8 @@
   *   and Boston fern for removing chemicals and biological compounds.
   *   https://cdn.sparkfun.com/assets/learn_tutorials/1/4/3/ECA_Report19.pdf
   */
-  #include "src/SparkFun_CCS811_Arduino_Library/src/SparkFunCCS811.h" //Click here to get the library: http://librarymanager/All#SparkFun_CCS811
+  //#include "src/SparkFun_CCS811_Arduino_Library/src/SparkFunCCS811.h" //Click here to get the library: http://librarymanager/All#SparkFun_CCS811
+  #include "src/CCS811-master/src/ccs811.h"
   
   //#define CCS811_ADDR 0x5B //2nd I2C Address (HIGH)
   #define CCS811_ADDR 0x5A //1st I2C Address (LOW)
@@ -355,8 +375,8 @@
 /******************************
  * Basic init
  *****************************/
-  unsigned long lastDebounceTime = 0;  // the last time the output pin was toggled
-  #define BTN_DEBOUNCE_DELAY_MS 50 //delay to filter btn chattering phenomenon
+  //unsigned long lastDebounceTime = 0;  // the last time the output pin was toggled
+  //#define BTN_DEBOUNCE_DELAY_MS 50 //delay to filter btn chattering phenomenon
 
   time_t now;
 

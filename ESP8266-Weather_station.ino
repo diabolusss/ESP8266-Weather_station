@@ -1,5 +1,5 @@
 #define DEBUG
-//#define CCS811_STORE_BASELINE
+#define CCS811_STORE_BASELINE
 #include "settings.h"
 #include "UIHelper.h"
 
@@ -17,36 +17,53 @@ void setup() {
   #ifdef DEBUG
     // Serial port for debugging purposes
     Serial.begin(115200);
-    delay(1000); //timeout to make serial come up
+    delay(10000); //timeout to make serial come up
+  #endif
+
+  #ifdef _EEPROM_
+    EEPROMPool.size(EEPROM_SECTOR_POOL_COUNT);
+    EEPROMPool.begin(EEPROM_SECTOR_POOL_SIZE);
+    //EEPROMPool.offset(EEPROM_SECTOR_POOL_SIZE-4); //store 2Byte CRC and 1B auto increment at the very end of sector 
   #endif
 
   Wire.begin(SDA_PIN, SDC_PIN);
 
   {
     //This begins the CCS811 sensor and prints error status of .beginWithStatus()
-    CCS811Core::CCS811_Status_e status = MCU811b.beginWithStatus();
+    bool status = MCU811b.begin();
+    #ifdef DEBUG
       PRINT("CCS811 >>> begin status ");
-      PRINTLN(MCU811b.statusString(status));
-
-      //#todo retrieve firmware data
+      PRINTLN(status ? "ok" : "failed");
       
-    if(status == CCS811Core::CCS811_Stat_SUCCESS){ //restore baseline if available
+      PRINT(" HW version: ");           PRINTLN2(MCU811b.hardware_version(),HEX);
+      PRINT(" bootloader  version: ");  PRINTLN2(MCU811b.bootloader_version(),HEX);
+      // Check if flashing should be executed
+      if( MCU811b.application_version() >= 0x2000 ) { 
+        PRINT(" APP version is up to date: 0x");
+        PRINTLN2(MCU811b.application_version(),HEX);
+      }else{
+        PRINTLN(" CCS811 has old app version, consider upgrading...");
+      }
+    #endif
+  
+    #ifdef _EEPROM_ //try to restore baseline
+      uint16_t baseline = eepromGetBaseline(&EEPROMPool);
+      if(baseline > 0 && baseline != 0xFFFF){
+         PRINT("CCS811 >>> Applying retrieved baseline 0x");
+         PRINTLN2(baseline, HEX);
+         status = MCU811b.set_baseline(baseline);
+         
+         PRINT("CCS811 >>> Baseline set status ");
+         PRINTLN(status ? "OK" : "FAILED");
+      }else{
+         PRINTLN("EEPROM >>> Missing CCS811 baseline data.");
+      }
+    #endif
       
-      #ifdef CCS811_STORE_BASELINE
-        uint16_t baseline = eepromGetBaseline();
-        if(baseline > 0 && baseline != 255){
-           PRINT("CCS811 >>> Applying retrieved baseline 0x");
-           PRINTLN2(baseline, HEX);
-           status = MCU811b.setBaseline(baseline);
-           
-           PRINT("CCS811 >>> Baseline set status ");
-           PRINTLN(MCU811b.statusString(status));
-        }else{
-           PRINTLN("EEPROM >>> Missing CCS811 baseline data.");
-        }
-      #endif
-      
-    }
+    // Start measuring
+    status = MCU811b.start(CCS811_MODE_1SEC);
+    if( !status ){ PRINTLN("CCS811 >>> measure start FAILED");
+    } else {PRINTLN("CCS811 >>> measuring every 1 sec");}
   }
 
   {//prepare hdc1080
@@ -158,7 +175,7 @@ void loop() {
     readTemperatureHumidity();
     readAtmosphere();
     if(humidity > 0 && temp > ABSOLUTE_ZERO_TEMP_C){ 
-      MCU811b.setEnvironmentalData(humidity, temp); //compensate CCS811 environment 
+      MCU811b.set_envdata_Celsius_percRH(temp, humidity); //compensate CCS811 environment 
                                                      // NB (dont use builtin hdc1080 as CCS811 introduces heat dissipation error)
     }
     readLight();
@@ -183,7 +200,16 @@ void loop() {
       
     }else if(D7Button.isPress()){
       PRINTLN("PRESS");
-      
+       PRINT("EEPROM >>> retrieved baseline 0x");
+       PRINTLN2(eepromGetBaseline(&EEPROMPool), HEX);
+       PRINT("EEPROM >>> begin 0x");
+       PRINTLN2(EEPROMPool.read(10), HEX);
+       PRINT("EEPROM >>> end 0x");
+       PRINTLN2(EEPROMPool.read(13), HEX);
+       PRINT("EEPROM >>> baseline 0x");
+       PRINT2(EEPROMPool.read(11), HEX);
+       PRINTLN2(EEPROMPool.read(12), HEX);
+
     }else if(D7Button.isClick()){
       if(D7Button.isDoubleClick()){
         PRINTLN("DBL CLICK");
@@ -211,13 +237,13 @@ void loop() {
 }
 
 void readCCS811b(){
-  //retrieve data only if it's available
   //todo use interrupt to avoid calling dataAvailable
-  if (MCU811b.dataAvailable())  {
-    MCU811b.readAlgorithmResults();
+  uint16_t eco2, etvoc, errstat, raw;
+  MCU811b.read(&eco2,&etvoc,&errstat,&raw); 
 
-    eCO2 = MCU811b.getCO2();
-    eTVOC = MCU811b.getTVOC();
+  if( errstat==CCS811_ERRSTAT_OK ) {
+    eCO2 = eco2;
+    eTVOC = etvoc;
     
     PRINT("CO2[");
     PRINT(eCO2); //calculated CO2 reading
@@ -225,12 +251,18 @@ void readCCS811b(){
     PRINT(eTVOC); //calculated TVOC reading
     PRINT("]");
     PRINTLN();
-    
-  } else if (MCU811b.checkForStatusError())  {
-    #ifdef DEBUG
-      printSensorError();
-    #endif
-  }
+   } else if( errstat==CCS811_ERRSTAT_OK_NODATA ) {
+      PRINTLN("waiting for (new) data");
+   } else if( errstat & CCS811_ERRSTAT_I2CFAIL ) { 
+      PRINTLN("I2C error");
+   } else {
+      PRINT( "error: " );
+      PRINTLN( MCU811b.errstat_str(errstat) ); 
+   }
+
+   MCU811b.get_baseline(&raw);
+   PRINT("CCS811 >>> current baseline 0x");
+   PRINTLN2(raw, HEX);
 }
 
 /**
@@ -252,12 +284,21 @@ void readCCS811b(){
  *    0xnnmm is the saved data.
  */
 void storeCCS811Baseline(){
-  const uint16_t baseline = MCU811b.getBaseline();
-  PRINT("CCS811 >>> storing baseline 0x");
-  PRINTLN2(baseline, HEX);
-  #ifdef CCS811_STORE_BASELINE
-    eepromStoreBaseline(baseline);
-  #endif
+  uint16_t baseline;
+  bool ok = MCU811b.get_baseline(&baseline);
+  if(ok){
+    #ifdef _EEPROM
+    ok = (baseline != eepromGetBaseline(&EEPROMPool));
+    #endif
+  }else{ PRINT("CCS811 >>> Failed to get baseline"); return;}
+
+  if(ok){
+      PRINT("CCS811 >>> storing baseline 0x");
+      PRINTLN2(baseline, HEX);
+      #ifdef CCS811_STORE_BASELINE
+        eepromStoreBaseline(&EEPROMPool, baseline);
+      #endif
+   }else{ PRINT("CCS811 >>> Baseline already exists");}
 }
 
 //read temperature humidity data
@@ -440,7 +481,7 @@ void uploadTemperatureHumidity(){
    *  saved within the error register.
   */
   void printSensorError(){
-    uint8_t error = MCU811b.getErrorRegister();
+    uint8_t error;// = MCU811b.getErrorRegister();
   
     if (error == 0xFF){ //comm error
       PRINTLN("Failed to get ERROR_ID register.");

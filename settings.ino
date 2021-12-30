@@ -1,22 +1,37 @@
 #include "settings.h"
-  #ifdef _EEPROM
-  uint16_t  eepromGetBaseline(){
-      if ( !(EEPROM.read(0) == EEPROM_BASELINE_START_1B && EEPROM.read(1) == EEPROM_BASELINE_START_2B) )  {
+  #ifdef _EEPROM_
+  /**
+   *  Locations that have never been written to have the value of 255.
+   */
+  uint16_t  eepromGetBaseline(EEPROM_Rotate* _EEPROM){
+      if ( !(_EEPROM->read(10) == EEPROM_BASELINE_START_1B && _EEPROM->read(13) == EEPROM_BASELINE_START_2B) )  {
         return 0;
       }
   
       //baseline is packed into a 16 bit word
-      return  (((unsigned int)EEPROM.read(2) << 8) | EEPROM.read(3));
+      return  (((unsigned int)_EEPROM->read(11) << 8) | _EEPROM->read(12));
   }
-  
-  uint16_t eepromStoreBaseline(uint16_t baseline){
+
+  /**
+   *  The value is written only if differs from the one already saved at the same address.
+   *  
+   *  NB An EEPROM write takes 3.3 ms to complete. 
+   *  NB The EEPROM memory has a specified life of 100,000 write/erase cycles, so 
+   *    using update function instead of write() can save cycles if the written data does not change often
+   */
+  uint16_t eepromStoreBaseline(EEPROM_Rotate* _EEPROM, uint16_t baseline){
     if(baseline == 0) { return 0;}
 
-    EEPROM.write(0, EEPROM_BASELINE_START_1B);
-    EEPROM.write(1, EEPROM_BASELINE_START_2B);
-    EEPROM.write(2, (baseline >> 8) & 0x00FF);
-    EEPROM.write(3, baseline & 0x00FF);
+    _EEPROM->write(10, EEPROM_BASELINE_START_1B);
+    _EEPROM->write(13, EEPROM_BASELINE_START_2B);
+    _EEPROM->write(11, (baseline >> 8) & 0x00FF);
+    _EEPROM->write(12, baseline & 0x00FF);
 
+    bool ok = _EEPROM->commit();
+
+    PRINT("EEPROM >>> save status ");
+    PRINTLN(ok ? "OK" : "FAILED");
+    
     return baseline;
   }
   #endif  

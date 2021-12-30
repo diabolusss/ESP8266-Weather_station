@@ -1,7 +1,7 @@
 # ESP8266-Weather_station
-esp8266, cjmcu8118+hdc1080, bmp180, ccs811, gy30, ssd1306 oled
+esp8266, cjmcu8118+hdc1080, bmp180, ccs811, gy30, ssd1306 oled, eeprom, switch interrupt handler
 
- Indoor air quality & weather station with display.
+ Indoor air quality & weather station with Oled display.
  https://thingspeak.com/channels/1579072
  
 # Features:
@@ -13,11 +13,12 @@ esp8266, cjmcu8118+hdc1080, bmp180, ccs811, gy30, ssd1306 oled
   - display sleep timeout;
   - display on/off by button click;
   - read sensors every second, upload data to thingspeak once in a minute;
+  - store CCS811 baseline into EEPROM and restore;
 
 # todo
+  - > bug: button event press often keeps unpressed (on next click recognized smth else)
   - check bmp180 temperature reading sanity (+2 *C reading difference compared to real thermometer)
-  - check ccs811 firmware version and upgrade if needed
-  - save/restore ccs811 baseline to/from EEPROM. (save onClick & by timer - how often?)
+  - > save/restore ccs811 baseline to/from EEPROM. (save onClick & by timer - how often? restore after 20 min or check baseline is steady?)
   - lower sensor reading frequency based on inactivity time
   - add forecast day/night temperatures
   - add more details for current weather data
