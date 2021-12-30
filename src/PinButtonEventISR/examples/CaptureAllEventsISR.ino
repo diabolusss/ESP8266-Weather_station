@@ -6,7 +6,7 @@
 #define DEBUG
 #include <PinButtonEventISR.h>
 
-PinButtonEventISR D7Button(7);//attach button leg to data pin
+PinButtonEventISR D7Button(D7); //if you are getting WDT reset, change pin notation, i.e. from raw number into Dn
 
 void setup() {
   // initialize serial and wait for port to open:

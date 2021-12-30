@@ -1,5 +1,6 @@
 #define DEBUG
 #define CCS811_STORE_BASELINE
+//#define CCS811_RESTORE_BASELINE
 #include "settings.h"
 #include "UIHelper.h"
 
@@ -17,13 +18,15 @@ void setup() {
   #ifdef DEBUG
     // Serial port for debugging purposes
     Serial.begin(115200);
-    delay(10000); //timeout to make serial come up
+    delay(10000); //timeout to be sure that serial is ready
   #endif
 
   #ifdef _EEPROM_
     EEPROMPool.size(EEPROM_SECTOR_POOL_COUNT);
     EEPROMPool.begin(EEPROM_SECTOR_POOL_SIZE);
-    //EEPROMPool.offset(EEPROM_SECTOR_POOL_SIZE-4); //store 2Byte CRC and 1B auto increment at the very end of sector 
+    //EEPROMPool.offset(EEPROM_SECTOR_POOL_SIZE-4); //2Byte CRC and 1B auto increment wil be stored there
+                                                    //INCORRECT
+                                                    // default: sector begin 
   #endif
 
   Wire.begin(SDA_PIN, SDC_PIN);
@@ -51,10 +54,13 @@ void setup() {
       if(baseline > 0 && baseline != 0xFFFF){
          PRINT("CCS811 >>> Applying retrieved baseline 0x");
          PRINTLN2(baseline, HEX);
+         
+         #ifdef CCS811_RESTORE_BASELINE
          status = MCU811b.set_baseline(baseline);
          
          PRINT("CCS811 >>> Baseline set status ");
          PRINTLN(status ? "OK" : "FAILED");
+         #endif
       }else{
          PRINTLN("EEPROM >>> Missing CCS811 baseline data.");
       }
@@ -276,18 +282,18 @@ void readCCS811b(){
  *  addr: data  
  *  ----------  
  *  0x00: 0xA5  
- *  0x01: 0xB2  
- *  0x02: 0xnn  
- *  0x03: 0xmm
+ *  0x01: 0xnn  
+ *  0x02: 0xmm
+ *  0x03: 0xB2  
  *  
- *    0xA5B2 is written as an indicator that 0x02 and 0x03 contain a valid number.
+ *    0xA5B2 is written as an indicator that 0x01 and 0x02 contains a valid number.
  *    0xnnmm is the saved data.
  */
 void storeCCS811Baseline(){
   uint16_t baseline;
   bool ok = MCU811b.get_baseline(&baseline);
   if(ok){
-    #ifdef _EEPROM
+    #ifdef _EEPROM_
     ok = (baseline != eepromGetBaseline(&EEPROMPool));
     #endif
   }else{ PRINT("CCS811 >>> Failed to get baseline"); return;}

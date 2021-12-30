@@ -43,6 +43,8 @@
   //system libs
     #ifdef CCS811_STORE_BASELINE
       #define _EEPROM_
+    #elif defined CCS811_RESTORE_BASELINE
+      #define _EEPROM_
     #endif
 
     #ifdef _EEPROM_
@@ -55,7 +57,7 @@
        * 
        * Ro overcome this use sector rotation.
        */
-      #define NO_GLOBAL_EEPROM
+      #define NO_GLOBAL_EEPROM //disable default eeprom object
       #include <EEPROM_Rotate.h>
       
       #define EEPROM_BASELINE_START_1B 0xA5
@@ -80,7 +82,6 @@
  * Interrupt driven events
  **************************/
   #include "src/PinButtonEventISR/src/PinButtonEventISR.h"
-  //#define BUTTON_NORMALLY_CLOSED  
   PinButtonEventISR D7Button(OLED_WAKEUP_BTN);
 
 /***************************

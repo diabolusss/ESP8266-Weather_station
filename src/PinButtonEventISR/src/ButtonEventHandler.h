@@ -15,11 +15,13 @@
   #define _HIGH HIGH
 #endif
 
-#define BTN_DEBOUNCE_DELAY_MS 		50
-#define BTN_CLICK_DELAY_MS 		250
-#define BTN_DOUBLE_CLICK_DELAY_MS 	350
-#define BTN_HOLD_DELAY_MS 		1000
-#define BTN_LONG_PRESS_DELAY_MS 	3000
+#define BTN_DEBOUNCE_DELAY_MS 		  50
+#define BTN_CLICK_DELAY_MS 		  250
+#define BTN_DOUBLE_CLICK_DELAY_MS 	  350
+#define BTN_HOLD_DELAY_MS 		  1000
+#define BTN_LONG_PRESS_DELAY_MS 	  3000
+
+//#define DEBUG
 
 #ifdef DEBUG
   #define PRINTLN(s)    Serial.println(s)
@@ -41,7 +43,86 @@ class ButtonEventHandler{
 	//ButtonEventHandler();
 	
   public:
-    // Return values
+    /**
+     * Note:
+     * - SingleClick is only emitted when it's definitely not going to be a double or long click (any type of press)
+     * - Click is emitted when either SingleClick or DoubleClick happens 
+     *
+     * Several example patterns and resulting states.
+     * Delays aren't at scale. State transitions when input
+     * changes are based on that input, transitions when
+     * input didn't change are due to timeouts.
+     * Starting state is NONE.
+     * 
+     * Rising edge can be identified as event, too (but is not yet), i.e. start of press event
+     * previous state was LOW && now is HIGH && delay > BTN_DEBOUNCE_DELAY_MS
+     * _____/---___________________
+     *      |  |   
+     *      |  |   
+     *      |  |   
+     *      |  |   
+     *      |  |   
+     *      |  Debounced PRESS - uncaptured, but handled
+     *      |
+     *      Physical press on switch
+     *
+     * Clean single click (can be identified as LONG_CLICK if needed, CLICK is not emitted):
+     * delay > BTN_DOUBLE_CLICK_DELAY_MS && delay < BTN_HOLD_DELAY_MS
+     * _____/------\___________________
+     *        |   |   ||      NONE <- event read or EVENT_RESET_DELAY_MS has passed
+     *        |   |   ||      
+     *        |   |   |(ClickIdle) - uncaptured
+     *        |   |   (ClickUp) - uncaptured
+     *        |   SINGLE_CLICK <- (tH < BTN_HOLD_DELAY_MS && tH > BTN_DOUBLE_CLICK_DELAY_MS)
+     *        Debounced PRESS - uncaptured 
+     *        
+     * (Single) click:
+     * delay > BTN_DEBOUNCE_DELAY_MS && delay < BTN_CLICK_DELAY_MS && (no click before BTN_DOUBLE_CLICK_DELAY_MS)
+     * _____/-------\____#####___________
+     *        |   |   ||      |   NONE <- event read or EVENT_RESET_DELAY_MS has passed
+     *        |   |   ||      SingleClick <- idle for BTN_DOUBLE_CLICK_DELAY_MS time
+     *        |   |   |(ClickIdle) - uncaptured
+     *        |   |   (ClickUp) - uncaptured
+     *        |   CLICK <- before BTN_CLICK_DELAY_MS
+     *        Debounced PRESS
+     *
+     * Clean double click:
+     * delay > BTN_CLICK_DELAY_MS && delay < BTN_DOUBLE_CLICK_DELAY_MS
+     * _____/------\____/------\_________________
+     *        |   |   ||    |     NONE <- event read or EVENT_RESET_DELAY_MS has passed
+     *        |   |   ||    |  
+     *        |   |   ||    DBL_CLICK <- second press before BTN_DOUBLE_CLICK_DELAY_MS has passed
+     *        |   |   |(ClickIdle) - uncaptured
+     *        |   |   (ClickUp) - uncaptured
+     *        |   CLICK <- before BTN_CLICK_DELAY_MS
+     *        Debounced PRESS
+     *        
+     * Clean hold:
+     * delay >= BTN_HOLD_DELAY_MS && delay < BTN_LONG_PRESS_DELAY_MS && !CLICK
+     * _____/--------------------\_____________________
+     *        |                   |   ||         NONE <- event read or EVENT_RESET_DELAY_MS has passed
+     *        |                   |   ||      
+     *        |                   |   ||    
+     *        |                   |   |(ClickIdle) - uncaptured
+     *        |                   |   (ClickUp) - uncaptured
+     *        |                   HOLD <- only if it's not any tipe of click and BTN_HOLD_DELAY_MS is passed, 
+     *        |                             but not yet long press
+     *        Debounced PRESS 
+     *        
+     * Clean long hold:
+     * delay >= BTN_LONG_PRESS_DELAY_MS && !CLICK
+     * _____/--------------------------------\_____________________
+     *        |                               |   ||         NONE <- event read or EVENT_RESET_DELAY_MS has passed
+     *        |                               |   ||      
+     *        |                               |   ||    
+     *        |                               |   |(ClickIdle) - uncaptured
+     *        |                               |   (ClickUp) - uncaptured
+     *        |                               LONG_HOLD <- only if it's not any tipe of click 
+     *        |                                               and BTN_LONG_PRESS_DELAY_MS is passed 
+     *        |                            
+     *        Debounced PRESS
+     *        
+     */
     typedef enum {
       NONE,
       CLICK,
@@ -88,7 +169,7 @@ class ButtonEventHandler{
      * earlier than a Single click.
      */
     static bool isClick() {
-      return event == CLICK || event == DBL_CLICK;
+      return event == CLICK || event == DBL_CLICK || event == SNGL_CLICK;
     }
 
     /**
@@ -100,9 +181,13 @@ class ButtonEventHandler{
         if((millis() - risingTs) > BTN_DOUBLE_CLICK_DELAY_MS){
           event = NONE;
           //event = SNGL_CLICK;
-          return true;
-          
-        }else {return false;}
+          return true; //is single click, so skip setting event as it's already obsolete
+        }
+        
+      }else{
+        bool is = event == SNGL_CLICK; 
+        if(is) {event = NONE;}
+        return is;
       }
       
       return false;

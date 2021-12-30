@@ -1,5 +1,5 @@
 # ESP8266-Weather_station
-esp8266, cjmcu8118+hdc1080, bmp180, ccs811, gy30, ssd1306 oled, eeprom, switch interrupt handler
+esp8266, cjmcu8118+hdc1080, bmp180, ccs811, gy30, ssd1306 oled, rotated eeprom, switch interrupt handler
 
  Indoor air quality & weather station with Oled display.
  https://thingspeak.com/channels/1579072
@@ -11,21 +11,23 @@ esp8266, cjmcu8118+hdc1080, bmp180, ccs811, gy30, ssd1306 oled, eeprom, switch i
   - weather forecast frame: forecast for 3 days - day, icon and temperature;
   - frame autochange;
   - display sleep timeout;
-  - display on/off by button click;
+  - display on/off by button onSingleClick;
   - read sensors every second, upload data to thingspeak once in a minute;
-  - store CCS811 baseline into EEPROM and restore;
+  - store CCS811 baseline into EEPROM (onLongPress) and restore (?);
 
 # todo
-  - > bug: button event press often keeps unpressed (on next click recognized smth else)
   - check bmp180 temperature reading sanity (+2 *C reading difference compared to real thermometer)
-  - > save/restore ccs811 baseline to/from EEPROM. (save onClick & by timer - how often? restore after 20 min or check baseline is steady?)
+  - > save/restore ccs811 baseline to/from EEPROM. (save onClick & by timer - how often? restore after 20 min or check that baseline is steady?)
   - lower sensor reading frequency based on inactivity time
   - add forecast day/night temperatures
   - add more details for current weather data
   
 # Custom libraries and changes 
  * PinButtonEventISR
-   - static library to use with button interrupts. Handles debounced clicks (single, double) and press (short, long) events.
+   - static library to use with button interrupts. Handles debounced clicks (single, double, may identify long click too and press*) and hold (short, long) events. 
+     (every click and hold starts with press which currently is not identified)
+   #211230 v1.1.0
+    - fix gap after dbl click delay and before hold delay occurs
    
  * SparkFun_CCS811_Arduino_Library
    - read firmware, bootloader, application versions ([ported from](https://github.com/maarten-pennings/CCS811))

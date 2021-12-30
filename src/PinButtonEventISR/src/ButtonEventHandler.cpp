@@ -59,6 +59,14 @@ ICACHE_RAM_ATTR void ButtonEventHandler::onButtonChangeISR() {
         ButtonEventHandler::risingTs = millis();
   
         PRINTLN(">>> longpress ended ");
+        
+      }else{//if hold time haven't passed, and it's a single click, then identify it as such
+            //can be identified as LONG_SINGLE_CLICK
+        ButtonEventHandler::event = SNGL_CLICK;
+        ButtonEventHandler::state = _LOW;
+        ButtonEventHandler::risingTs = millis();
+      
+        PRINTLN(">>> (long) single click ended ");
       }
       
     }//end of hold events

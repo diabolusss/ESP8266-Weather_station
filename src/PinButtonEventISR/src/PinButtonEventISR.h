@@ -17,9 +17,10 @@ class PinButtonEventISR{
      * @param pin {int} Arduino pin to use
      */
     PinButtonEventISR(uint8_t _pin){
+      ButtonEventHandler::setPin(_pin);
+      
       pinMode(_pin, INPUT_PULLUP);
       _attachInterrupt(_pin);
-      ButtonEventHandler::setPin(_pin);
     }
     
     bool hasEvent(){
