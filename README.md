@@ -1,7 +1,8 @@
 # ESP8266-Weather_station
-esp8266, cjmcu8118+hdc1080, bmp180, ccs811, gy30, ssd1306 oled, rotated eeprom, switch interrupt handler
+esp8266, cjmcu8118+hdc1080, bmp180, ccs811, gy30, ssd1306 oled, rotated eeprom, switch interrupt handler, bmp180 custom calibration
 
  Indoor air quality & weather station with Oled display.
+ 
  https://thingspeak.com/channels/1579072
  
 # Features:
@@ -14,7 +15,7 @@ esp8266, cjmcu8118+hdc1080, bmp180, ccs811, gy30, ssd1306 oled, rotated eeprom, 
   - display on/off by button onSingleClick;
   - read sensors every second, upload data to thingspeak once in a minute;
   - store CCS811 baseline into EEPROM (onLongPress) and restore (on boot & onPress);
-  - custom calibration for bmp180 temperature sensor to fix factory calibration (or soldering overheating failure)
+  - custom calibration for bmp180 temperature sensor to fix factory calibration (or soldering overheating failure) (seek for .ods in project src lib folder)
 
 # todo
   - > restore ccs811 baseline from EEPROM. (by timer - restore after 20 min or check that baseline is steady?)
@@ -24,8 +25,12 @@ esp8266, cjmcu8118+hdc1080, bmp180, ccs811, gy30, ssd1306 oled, rotated eeprom, 
   - add more details for current weather data (sun/moon daytime)
   
 # remarks
-  - tocheck# it seems a bad idea to get CCS811 baseline from outdoors at low temperature to use indoors.
-  [img]calibrated_outdoors_negative_temperature_high_humidity.png
+  - tocheck# it seems it's a bad idea to train CCS811 baseline outdoors at low temperature for indoor use.
+  - maybe it needs some more time to settle down?
+  - how wrong temperature compensation affects baseline training?
+
+
+  ![img](resources/calibrated_outdoors_negative_temperature_high_humidity.png)
   
 # Custom libraries and changes 
  * PinButtonEventISR
@@ -37,6 +42,7 @@ esp8266, cjmcu8118+hdc1080, bmp180, ccs811, gy30, ssd1306 oled, rotated eeprom, 
  * Adafruit_BMP085_Library
    - allow to override factory calibration variables, to fix faulty readings (faulty calibration or overheating failure)
    - at the same time allow to calculate pressure using factory calibration
+   - NB temperature compensation works like a charm, however some time needed to be completely sure 
     
  * SparkFun_CCS811_Arduino_Library
    - read firmware, bootloader, application versions ([ported from](https://github.com/maarten-pennings/CCS811))
