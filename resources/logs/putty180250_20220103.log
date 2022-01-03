@@ -1,0 +1,235 @@
+=~=~=~=~=~=~=~=~=~=~=~= PuTTY log 2022.01.03 18:02:50 =~=~=~=~=~=~=~=~=~=~=~=
+>>>> Setting readyForSensorDataUpload to true
+>>>> Setting read>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 24.04; BMP factory = 20.90; custom = 13.90 *C
+Humidity=44%
+Pressure = 99762 Pascal
+Altitude = 130.87 meters
+Pressure at sealevel (calculated) = 99769 Pa
+Real altitude = 145.13 meters
+light: 4
+CO2[1770] tVOC[414]
+CCS811 >>> current baseline 0x29C0
+>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 24.12; BMP factory = 20.90; custom = 13.90 *C
+Humidity=44%
+Pressure = 99758 Pascal
+Altitude = 130.87 meters
+Pressure at sealevel (calculated) = 99764 Pa
+Real altitude = 144.62 meters
+light: 4
+CO2[1765] tVOC[409]
+CCS811 >>> current baseline 0x29C0
+>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 24.07; BMP factory = 20.90; custom = 13.90 *C
+Humidity=44%
+Pressure = 99756 Pascal
+Altitude = 130.78 meters
+Pressure at sealevel (calculated) = 99760 Pa
+Real altitude = 144.62 meters
+light: 4
+CO2[1765] tVOC[409]
+CCS811 >>> current baseline 0x29C0
+>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 24.07; BMP factory = 20.90; custom = 13.90 *C
+Humidity=44%
+Pressure = 99760 Pascal
+Altitude = 130.95 meters
+Pressure at sealevel (calculated) = 99764 Pa
+Real altitude = 144.96 meters
+light: 4
+CO2[1770] tVOC[414]
+CCS811 >>> current baseline 0x29C0
+>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 24.01; BMP factory = 20.90; custom = 13.90 *C
+Humidity=44%
+Pressure = 99761 Pascal
+Altitude = 131.03 meters
+Pressure at sealevel (calculated) = 99756 Pa
+Real altitude = 145.80 meters
+light: 4
+CO2[1770] tVOC[414]
+CCS811 >>> current baseline 0x29C0
+>>>> Setting readyForSensorDataUpload to true
+>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 24.00; BMP factory = 20.90; custom = 13.90 *C
+Humidity=44%
+Pressure = 99762 Pascal
+Altitude = 131.20 meters
+Pressure at sealevel (calculated) = 99759 Pa
+Real altitude = 145.55 meters
+light: 4
+CO2[1765] tVOC[409]
+CCS811 >>> current baseline 0x29C0
+>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 24.00; BMP factory = 20.90; custom = 13.90 *C
+Humidity=44%
+Pressure = 99762 Pascal
+Altitude = 131.03 meters
+Pressure at sealevel (calculated) = 99764 Pa
+Real altitude = 145.13 meters
+light: 4
+CO2[1765] tVOC[409]
+CCS811 >>> current baseline 0x29C0
+>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 24.07; BMP factory = 20.90; custom = 13.90 *C
+Humidity=44%
+Pressure = 99752 Pascal
+Altitude = 130.70 meters
+Pressure at sealevel (calculated) = 99766 Pa
+Real altitude = 145.46 meters
+light: 4
+CO2[1765] tVOC[409]
+CCS811 >>> current baseline 0x29C0
+>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 23.95; BMP factory = 20.90; custom = 13.90 *C
+Humidity=44%
+Pressure = 99762 Pascal
+Altitude = 131.37 meters
+Pressure at sealevel (calculated) = 99764 Pa
+Real altitude = 145.21 meters
+light: 4
+CO2[1770] tVOC[414]
+CCS811 >>> current baseline 0x29C0
+>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 24.01; BMP factory = 20.90; custom = 13.90 *C
+Humidity=44%
+Pressure = 99762 Pascal
+Altitude = 131.20 meters
+Pressure at sealevel (calculated) = 99761 Pa
+Real altitude = 144.79 meters
+light: 4
+CO2[1770] tVOC[414]
+CCS811 >>> current baseline 0x29C0
+>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 24.00; BMP factory = 20.80; custom = 13.80 *C
+Humidity=44%
+Pressure = 99757 Pascal
+Altitude = 130.87 meters
+Pressure at sealevel (calculated) = 99766 Pa
+Real altitude = 144.96 meters
+light: 4
+CO2[1770] tVOC[414]
+CCS811 >>> current baseline 0x29C0
+>>>> Setting readyForSensorDataUpload to true
+>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 24.00; BMP factory = 20.80; custom = 13.80 *C
+Humidity=44%
+Pressure = 99758 Pascal
+Altitude = 130.78 meters
+Pressure at sealevel (calculated) = 99762 Pa
+Real altitude = 145.63 meters
+light: 4
+CO2[1765] tVOC[409]
+CCS811 >>> current baseline 0x29C0
+>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 24.04; BMP factory = 20.80; custom = 13.80 *C
+Humidity=44%
+Pressure = 99759 Pascal
+Altitude = 131.46 meters
+Pressure at sealevel (calculated) = 99756 Pa
+Real altitude = 145.29 meters
+light: 4
+CO2[1765] tVOC[409]
+CCS811 >>> current baseline 0x29C0
+>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 24.00; BMP factory = 20.80; custom = 13.80 *C
+Humidity=44%
+Pressure = 99759 Pascal
+Altitude = 130.87 meters
+Pressure at sealevel (calculated) = 99769 Pa
+Real altitude = 145.21 meters
+light: 4
+CO2[1765] tVOC[409]
+CCS811 >>> current baseline 0x29C0
+>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 24.02; BMP factory = 20.80; custom = 13.80 *C
+Humidity=44%
+Pressure = 99759 Pascal
+Altitude = 130.95 meters
+Pressure at sealevel (calculated) = 99767 Pa
+Real altitude = 145.38 meters
+light: 4
+CO2[1765] tVOC[409]
+CCS811 >>> current baseline 0x29C0
+>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 24.14; BMP factory = 20.80; custom = 13.80 *C
+Humidity=44%
+Pressure = 99762 Pascal
+Altitude = 130.61 meters
+Pressure at sealevel (calculated) = 99770 Pa
+Real altitude = 145.21 meters
+light: 4
+CO2[1769] tVOC[413]
+CCS811 >>> current baseline 0x29C0
+>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 24.12; BMP factory = 20.80; custom = 13.80 *C
+Humidity=44%
+Pressure = 99758 Pascal
+Altitude = 131.46 meters
+Pressure at sealevel (calculated) = 99764 Pa
+Real altitude = 144.96 meters
+light: 4
+CO2[1769] tVOC[413]
+CCS811 >>> current baseline 0x29C0
+>>>> Setting readyForSensorDataUpload to true
+>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 24.08; BMP factory = 20.90; custom = 13.90 *C
+Humidity=44%
+Pressure = 99758 Pascal
+Altitude = 130.36 meters
+Pressure at sealevel (calculated) = 99768 Pa
+Real altitude = 145.55 meters
+light: 4
+CO2[1775] tVOC[420]
+CCS811 >>> current baseline 0x29C0
+>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 24.13; BMP factory = 20.90; custom = 13.90 *C
+Humidity=45%
+Pressure = 99765 Pascal
+Altitude = 131.03 meters
+Pressure at sealevel (calculated) = 99760 Pa
+Real altitude = 145.46 meters
+light: 4
+CO2[1778] tVOC[425]
+CCS811 >>> current baseline 0x29C0
+>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 24.19; BMP factory = 20.90; custom = 13.90 *C
+Humidity=44%
+Pressure = 99758 Pascal
+Altitude = 131.29 meters
+Pressure at sealevel (calculated) = 99756 Pa
+Real altitude = 145.21 meters
+light: 4
+CO2[1769] tVOC[413]
+CCS811 >>> current baseline 0x29C0
+>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 24.22; BMP factory = 20.90; custom = 13.90 *C
+Humidity=44%
+Pressure = 99761 Pascal
+Altitude = 130.78 meters
+Pressure at sealevel (calculated) = 99766 Pa
+Real altitude = 145.63 meters
+light: 4
+CO2[1775] tVOC[420]
+CCS811 >>> current baseline 0x29C0
+>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 24.29; BMP factory = 20.90; custom = 13.90 *C
+Humidity=44%
+Pressure = 99760 Pascal
+Altitude = 131.29 meters
+Pressure at sealevel (calculated) = 99759 Pa
+Real altitude = 146.14 meters
+light: 4
+CO2[1778] tVOC[425]
+CCS811 >>> current baseline 0x29C0
+>>>> Setting readyForSensorsRead to true
+Temperature: CCS811HDC = 24.22; BMP factory = 21.00; custom = 14.00 *C
+Humidity=44%
+Pressure = 99760 Pascal
+Altitude = 130.78 meters
+Pressure at sealevel (calculated) = 99767 Pa
+Real altitude = 145.29 meters
+light: 4
+CO2[1775] tVOC[420]
+CCS811 >>> current baseline 0x29C0

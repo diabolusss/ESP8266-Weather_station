@@ -39,6 +39,11 @@
   void setReadyForSensorDataUpload() {
     PRINTLN(">>>> Setting readyForSensorDataUpload to true");
     readyForSensorDataUpload = true;
+
+    if(!ccs811BaselineRestored){//one shot counter
+      ++ccs811BaselineRestoreCount;//this method is called every 1 min; thus count at least for 23 to restore ccs baseline
+                                   //read datasheet for minimal delay
+    }
   }
   
   void setReadyForWeatherServiceUpdate() {

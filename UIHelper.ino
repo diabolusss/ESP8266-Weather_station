@@ -64,10 +64,6 @@ void drawProgress(OLEDDisplay *display, int percentage, String label) {
  */
 void drawIndoor(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
   if(!display->isAwake()){return;}
-   // PRINTF("drawIndoor %d",display->isAwake());
-  
-  char FormattedHumidity[10];
-  char FormattedAltitude[10];
   
   display->setTextAlignment(TEXT_ALIGN_LEFT);
   display->setFont(ArialMT_Plain_10);
@@ -82,6 +78,10 @@ void drawIndoor(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int1
   
   display->drawString(x, correct_y(20), "TVOC " + String(eTVOC));
   display->drawString(64+x, correct_y(20), "eCO2 " + String(eCO2));
+
+  char buf[10];
+    sprintf(buf, "0x%04X", ccs811_baseline);
+  display->drawString(x, correct_y(30), "BSL " + String(buf));
 }
 
 void drawDateTime(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {

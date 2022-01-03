@@ -22,7 +22,7 @@
 
   //sensor libs
     #include "DHT.h"
-    #include <Adafruit_BMP085.h>
+    #include "src/Adafruit_BMP085_Library/Adafruit_BMP085.h"
 
     #ifdef _I2C_OLED
       #include "src/esp8266-oled-ssd1306/src/SSD1306Wire.h"
@@ -276,7 +276,48 @@
   //#define BH1750FVI_LRES_MODE_ONCE          0b00100011 //Automatically set to Power Down mode after measurement.
                                                        //Measurement Time is typically 16ms
 
-  
+  /**
+   * The BMP180 delivers the uncompensated value of pressure and temperature
+   * The E2PROM has stored 176 bit of individual calibration data. This is used to
+   *  compensate offset, temperature dependence and other parameters of the sensor.
+   *  - UP = Uncalibrated pressure data (16 to 19 bit)
+   *  - UT = uncalibrated temperature data (16 bit)
+   *   For calculating temperature in °C and pressure in hPa, the calibration data has to be used. 
+   *   
+   *   The 176 bit E2PROM is partitioned in 11 words of 16 bit each. These contain 11 calibration
+   *    coefficients. 
+   *    
+   *  NB Every sensor module has individual coefficients. 
+   *       //pressure calibration
+   *        ac1 = 7800
+   *        ac2 = -1154
+   *        ac3 = -14445
+   *        ac4 = 33350
+   *        
+   *        b1 = 6515
+   *        b2 = 44
+   *       
+   *       mb = -32768 <- not used
+   *       
+   *       //temperature calibration
+   *        ac5 = 25614
+   *        ac6 = 18868
+   *        mc = -11786
+   *        md = 2446
+   *  
+   *  Before the first calculation of temperature and pressure, the master reads out the E2PROM data.
+   *    The data communication can be checked by checking that none of the words has the value 0 or
+   *    0xFFFF.
+   */
+   //Factory Temperature calibration param override
+   // For pressure calculation factory calibration will be used
+   //@see adafruit library to enable pressure and temperature calibration fix from inside
+   // fixing ~7*C offset from thermometer readings
+    #define AC5   24140
+    #define AC6   19911
+    #define MC  -10237
+    #define MD  2446
+    
   Adafruit_BMP085 bmp; //has own temperature sensor
   #define BMP180_I2C_ADDR 0b1110111  // BMP180: address:0x77
                                     // The LSB of the device address distinguishes between read (1) and write (0) operation,
@@ -353,6 +394,10 @@
     #define CURR_WEATHER_UPDATE_INTERVAL_SECS 20*60 // Update every 20 minutes
     #define DISPLAY_SLEEP_INTERVAL_SECS 5*60 //put display into sleep after 5 min
     
+    //#define CCS811_BASELINE_RESTORE_INTERVAL_ONESHOT_SECS 20*60 // is called once after 23 minutes have passed since boot
+    bool ccs811BaselineRestored = false;
+    uint8_t ccs811BaselineRestoreCount = 0;
+    
     Ticker forecastUpdateTicker;
     Ticker weatherUpdateTicker;
     Ticker sensorsReadTicker;
@@ -376,9 +421,6 @@
 /******************************
  * Basic init
  *****************************/
-  //unsigned long lastDebounceTime = 0;  // the last time the output pin was toggled
-  //#define BTN_DEBOUNCE_DELAY_MS 50 //delay to filter btn chattering phenomenon
-
   time_t now;
 
   unsigned int tempLight = 0;
@@ -387,9 +429,12 @@
                           // pressure of 1013.25 millibar = 101325 Pascal 
 
   float temp = ABSOLUTE_ZERO_TEMP_C; //temperature
+  float ccs811hdc1080Temp = 0;
   uint8_t humidity = 0; //humidity
   unsigned int eCO2 = 0;
   unsigned int eTVOC = 0;
+
+  uint16_t ccs811_baseline = 0;
 
 /******************************
  * EEPROM Prototypes

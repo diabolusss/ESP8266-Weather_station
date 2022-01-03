@@ -1,6 +1,6 @@
 #define DEBUG
 #define CCS811_STORE_BASELINE
-//#define CCS811_RESTORE_BASELINE
+#define CCS811_RESTORE_BASELINE
 #include "settings.h"
 #include "UIHelper.h"
 
@@ -45,27 +45,15 @@ void setup() {
         PRINT(" APP version is up to date: 0x");
         PRINTLN2(MCU811b.application_version(),HEX);
       }else{
-        PRINTLN(" CCS811 has old app version, consider upgrading...");
+        PRINTLN(" APP version is old, consider upgrading...");
       }
     #endif
-  
-    #ifdef _EEPROM_ //try to restore baseline
-      uint16_t baseline = eepromGetBaseline(&EEPROMPool);
-      if(baseline > 0 && baseline != 0xFFFF){
-         PRINT("CCS811 >>> Applying retrieved baseline 0x");
-         PRINTLN2(baseline, HEX);
-         
-         #ifdef CCS811_RESTORE_BASELINE
-         status = MCU811b.set_baseline(baseline);
-         
-         PRINT("CCS811 >>> Baseline set status ");
-         PRINTLN(status ? "OK" : "FAILED");
-         #endif
-      }else{
-         PRINTLN("EEPROM >>> Missing CCS811 baseline data.");
-      }
+    
+    #ifdef _EEPROM_ //just inform about baseline (will be restored after ~20 min)
+      PRINT("EEPROM >>> retrieved baseline 0x");
+      PRINTLN2(eepromGetBaseline(&EEPROMPool), HEX);
     #endif
-      
+    
     // Start measuring
     status = MCU811b.start(CCS811_MODE_1SEC);
     if( !status ){ PRINTLN("CCS811 >>> measure start FAILED");
@@ -89,7 +77,7 @@ void setup() {
       //by default:
       //  heater disabled
       //  T or RH is acquired in separate calls
-      //T res 14b & H res 14b
+      //  T res 14b & H res 14b
       PRINT("  Measurement Resolution: T=");
       PRINT2(reg.TemperatureMeasurementResolution, BIN);
       PRINT(" (0=14 bit, 1=11 bit)");
@@ -124,6 +112,32 @@ void setup() {
       PRINTLN("BMP180 >>> ready");
     }
     Wire.endTransmission();
+    
+    PRINTLN("BMP180 >>> Temperature calibration vars");
+    PRINT("  AC5=");
+      PRINTLN(bmp.getAC5());
+    PRINT("  AC6=");
+      PRINTLN(bmp.getAC6());
+    
+    PRINT("  MC=");
+      PRINTLN(bmp.getMC());
+    PRINT("  MD=");
+      PRINTLN(bmp.getMD());
+
+    PRINTLN("BMP180 >>> Pressure calibration vars");
+    PRINT("  AC1=");
+      PRINTLN(bmp.getAC1());
+    PRINT("  AC2=");
+      PRINTLN(bmp.getAC2());
+    PRINT("  AC3=");
+      PRINTLN(bmp.getAC3());
+    PRINT("  AC4=");
+      PRINTLN(bmp.getAC4());
+    
+    PRINT("  B1=");
+      PRINTLN(bmp.getB1());
+    PRINT("  B2=");
+      PRINTLN(bmp.getB2());
   }
 
   //initialize light sensor
@@ -170,12 +184,20 @@ void setup() {
   forecastUpdateTicker.attach(FORECAST_UPDATE_INTERVAL_SECS,      setReadyForWeatherServiceUpdate); //hours
   weatherUpdateTicker.attach(CURR_WEATHER_UPDATE_INTERVAL_SECS,   setReadyForCurrentWeatherUpdate); //minutes
   sensorsDataUploadTicker.attach(TS_WRITE_UPDATE_INTERVAL_SEC,    setReadyForSensorDataUpload);
-  sensorsReadTicker.attach(5,                                     setReadyForSensorsRead);
+  sensorsReadTicker.attach(10,                                     setReadyForSensorsRead);
 
   displaySleepTicker.attach(DISPLAY_SLEEP_INTERVAL_SECS, displayOff, (OLEDDisplay *)&display);
 }
 
 void loop() {  
+  if(!ccs811BaselineRestored){
+    if(ccs811BaselineRestoreCount > 23){ //wait at least 20min to restore it
+      restoreCCS811Baseline();
+      ccs811BaselineRestored = true;
+      ccs811BaselineRestoreCount = 0;
+    }
+  }
+  
   //Read Temperature Humidity every 5 seconds
   if(readyForSensorsRead){
     readTemperatureHumidity();
@@ -205,16 +227,8 @@ void loop() {
       storeCCS811Baseline();
       
     }else if(D7Button.isPress()){
-      PRINTLN("PRESS");
-       PRINT("EEPROM >>> retrieved baseline 0x");
-       PRINTLN2(eepromGetBaseline(&EEPROMPool), HEX);
-       PRINT("EEPROM >>> begin 0x");
-       PRINTLN2(EEPROMPool.read(10), HEX);
-       PRINT("EEPROM >>> end 0x");
-       PRINTLN2(EEPROMPool.read(13), HEX);
-       PRINT("EEPROM >>> baseline 0x");
-       PRINT2(EEPROMPool.read(11), HEX);
-       PRINTLN2(EEPROMPool.read(12), HEX);
+      //PRINTLN("PRESS");
+       restoreCCS811Baseline();
 
     }else if(D7Button.isClick()){
       if(D7Button.isDoubleClick()){
@@ -267,6 +281,7 @@ void readCCS811b(){
    }
 
    MCU811b.get_baseline(&raw);
+   ccs811_baseline = raw;
    PRINT("CCS811 >>> current baseline 0x");
    PRINTLN2(raw, HEX);
 }
@@ -307,12 +322,38 @@ void storeCCS811Baseline(){
    }else{ PRINT("CCS811 >>> Baseline already exists");}
 }
 
+void restoreCCS811Baseline(){
+  #ifdef _EEPROM_
+    //try to restore baseline
+    uint16_t baseline = eepromGetBaseline(&EEPROMPool);
+  
+    PRINT("EEPROM >>> retrieved baseline 0x");
+    PRINTLN2(baseline, HEX);
+         
+    if(baseline > 0 && baseline != 0xFFFF){
+       #ifdef CCS811_RESTORE_BASELINE
+       PRINT("CCS811 >>> Baseline restore ");
+       PRINTLN(MCU811b.set_baseline(baseline) ? "OK" : "FAILED");
+       #endif
+    }else{
+       PRINTLN("CCS811 >>> Missing or wrong baseline.");
+    }
+  #endif
+}
+
 //read temperature humidity data
 void readTemperatureHumidity(){
-  //hdc1080.readTemperature()); //dont use it, as CCS811 introduces heat dissipation error
-  temp = bmp.readTemperature();
-  PRINT("Temperature = ");
-  PRINT(temp);
+  PRINT("Temperature: ");
+  PRINT("CCS811HDC = ");
+    ccs811hdc1080Temp = hdc1080.readTemperature(); //dont use it, as CCS811 introduces heat dissipation error
+    PRINT(ccs811hdc1080Temp);
+  PRINT("; BMP factory = ");
+    PRINT(bmp.readTemperature());
+
+  PRINT("; custom = ");
+    temp = bmp.readCustomCalibratedTemperature(AC5, AC6, MC, MD);
+    PRINT(temp);
+    
   PRINTLN(" *C");
 
   humidity = hdc1080.readHumidity(); //The result of the acquisition is always a 14 bit value,
@@ -410,7 +451,25 @@ void uploadTemperatureHumidity(){
     String line = client.readStringUntil('\r');
     PRINT(line);
   }
-  
+
+  /*
+  fields = String("&field1=")+temp
+    + "&field2="+ccs811hdc1080Temp
+    //+ "&field3="+eTVOC
+    ;
+
+  //extra call for debugging
+  //doesn't work, possibly need to wait some time before making second call
+  client.print(String("GET ") + "/update?api_key="+THINGSPEAK_API_WRITE2 + fields 
+    +" HTTP/1.1\r\n" +"Host: " + THINGSPEAK_SERVER 
+    + "\r\n" + "Connection: close\r\n\r\n"
+  );
+    
+  while(client.available()){
+    String line = client.readStringUntil('\r');
+    PRINT(line);
+  }
+  */
   readyForSensorDataUpload = false; //reset
 }
 
@@ -480,38 +539,5 @@ void uploadTemperatureHumidity(){
       delay(1000);
     }
   }
-
-#ifdef DEBUG
-  /**
-   * gets, clears, then prints the errors
-   *  saved within the error register.
-  */
-  void printSensorError(){
-    uint8_t error;// = MCU811b.getErrorRegister();
-  
-    if (error == 0xFF){ //comm error
-      PRINTLN("Failed to get ERROR_ID register.");
-      
-    }  else  {
-      PRINT("Error: ");
-      if (error & 1 << 5)
-        PRINT("HeaterSupply");
-      if (error & 1 << 4)
-        PRINT("HeaterFault");
-      if (error & 1 << 3)
-        PRINT("MaxResistance");
-      if (error & 1 << 2)
-        PRINT("MeasModeInvalid");
-      if (error & 1 << 1)
-        PRINT("ReadRegInvalid");
-      if (error & 1 << 0)
-        PRINT("MsgInvalid");
-      PRINTLN();
-    }
-  }
-#endif
-  
-  
-  
 
   
