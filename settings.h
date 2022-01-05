@@ -359,10 +359,6 @@
   //@see secret.h for credentials THINGSPEAK_API_WRITE, THINGSPEAK_API_READ
   #define THINGSPEAK_SERVER "api.thingspeak.com"
   #define THINGSPEAK_PORT 80              
-  
-  #define TS_WRITE_UPDATE_INTERVAL_SEC 60 //sec
-                               //max Message update interval limit for home licence 1 upd/sec   
-                               //total messages per year 33 million (~90k/day)
 
 /***************************
  * Begin OpenWeatherMap settings
@@ -390,9 +386,14 @@
    * Begin ticker settings
    **************************/
     //service update interval (forecast, time, etc)
-    #define FORECAST_UPDATE_INTERVAL_SECS 12*60*60 // Update every 12 hours
-    #define CURR_WEATHER_UPDATE_INTERVAL_SECS 20*60 // Update every 20 minutes
-    #define DISPLAY_SLEEP_INTERVAL_SECS 5*60 //put display into sleep after 5 min
+    
+    #define TS_WRITE_UPDATE_INTERVAL_1M_SEC 60 //max Message update interval limit for home licence 1 upd/sec   
+                                              //total messages per year 33 million (~90k/day)
+    #define FORECAST_UPDATE_INTERVAL_12H_SECS 12*60*60 // Update every 12 hours
+    #define CURR_WEATHER_UPDATE_INTERVAL_20M_SECS 20*60 // Update every 20 minutes
+    #define DISPLAY_SLEEP_INTERVAL_5M_SECS 5*60 //put display into sleep after 5 min
+    #define SENSORS_READ_AWAKE_INTERVAL_3S_SECS 3 //while display is awake poll sensors frequently
+                                                  // when it's off, then poll based on upload time to server (ThingSpeak)
     
     //#define CCS811_BASELINE_RESTORE_INTERVAL_ONESHOT_SECS 20*60 // is called once after 23 minutes have passed since boot
     bool ccs811BaselineRestored = false;

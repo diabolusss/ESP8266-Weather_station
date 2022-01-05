@@ -1,4 +1,4 @@
-#define DEBUG
+//#define DEBUG
 #define CCS811_STORE_BASELINE
 #define CCS811_RESTORE_BASELINE
 #include "settings.h"
@@ -112,19 +112,8 @@ void setup() {
       PRINTLN("BMP180 >>> ready");
     }
     Wire.endTransmission();
-    
-    PRINTLN("BMP180 >>> Temperature calibration vars");
-    PRINT("  AC5=");
-      PRINTLN(bmp.getAC5());
-    PRINT("  AC6=");
-      PRINTLN(bmp.getAC6());
-    
-    PRINT("  MC=");
-      PRINTLN(bmp.getMC());
-    PRINT("  MD=");
-      PRINTLN(bmp.getMD());
 
-    PRINTLN("BMP180 >>> Pressure calibration vars");
+    PRINTLN(" Pressure calibration vars");
     PRINT("  AC1=");
       PRINTLN(bmp.getAC1());
     PRINT("  AC2=");
@@ -138,6 +127,17 @@ void setup() {
       PRINTLN(bmp.getB1());
     PRINT("  B2=");
       PRINTLN(bmp.getB2());
+
+    PRINTLN(" Temperature calibration vars");
+    PRINT("  AC5=");
+      PRINTLN(bmp.getAC5());
+    PRINT("  AC6=");
+      PRINTLN(bmp.getAC6());
+    
+    PRINT("  MC=");
+      PRINTLN(bmp.getMC());
+    PRINT("  MD=");
+      PRINTLN(bmp.getMD());
   }
 
   //initialize light sensor
@@ -181,25 +181,31 @@ void setup() {
   updateServiceData(&display);
 
   //attach INT_flags or maybe attach event handlers directly? (attaching directly triggers board crash
-  forecastUpdateTicker.attach(FORECAST_UPDATE_INTERVAL_SECS,      setReadyForWeatherServiceUpdate); //hours
-  weatherUpdateTicker.attach(CURR_WEATHER_UPDATE_INTERVAL_SECS,   setReadyForCurrentWeatherUpdate); //minutes
-  sensorsDataUploadTicker.attach(TS_WRITE_UPDATE_INTERVAL_SEC,    setReadyForSensorDataUpload);
-  sensorsReadTicker.attach(10,                                     setReadyForSensorsRead);
+  forecastUpdateTicker.attach(FORECAST_UPDATE_INTERVAL_12H_SECS,      setReadyForWeatherServiceUpdate); //hours
+  weatherUpdateTicker.attach(CURR_WEATHER_UPDATE_INTERVAL_20M_SECS,   setReadyForCurrentWeatherUpdate); //minutes
+  sensorsDataUploadTicker.attach(TS_WRITE_UPDATE_INTERVAL_1M_SEC,     setReadyForSensorDataUpload);
+  sensorsReadTicker.attach(SENSORS_READ_AWAKE_INTERVAL_3S_SECS,       setReadyForSensorsRead); //update twice before frame change
 
-  displaySleepTicker.attach(DISPLAY_SLEEP_INTERVAL_SECS, displayOff, (OLEDDisplay *)&display);
+  displaySleepTicker.attach(DISPLAY_SLEEP_INTERVAL_5M_SECS, displayOff, (OLEDDisplay *)&display);
 }
 
 void loop() {  
-  if(!ccs811BaselineRestored){
-    if(ccs811BaselineRestoreCount > 23){ //wait at least 20min to restore it
+  if(!ccs811BaselineRestored){//one shot baseline restore
+    if(ccs811BaselineRestoreCount == 1 || ccs811BaselineRestoreCount > 23){ //restore instantly for smooth graph
+                                                                            // then wait at least 20min for factory suggested restore
+                                                                            // meanwhile it may change
       restoreCCS811Baseline();
-      ccs811BaselineRestored = true;
-      ccs811BaselineRestoreCount = 0;
+      
+      if(ccs811BaselineRestoreCount > 23){
+        ccs811BaselineRestored = true;
+        ccs811BaselineRestoreCount = 0;
+      }
     }
   }
   
-  //Read Temperature Humidity every 5 seconds
-  if(readyForSensorsRead){
+  //Read Temperature Humidity every X seconds
+  // or just before uploading data to server
+  if(readyForSensorsRead || readyForSensorDataUpload){
     readTemperatureHumidity();
     readAtmosphere();
     if(humidity > 0 && temp > ABSOLUTE_ZERO_TEMP_C){ 
@@ -227,8 +233,8 @@ void loop() {
       storeCCS811Baseline();
       
     }else if(D7Button.isPress()){
-      //PRINTLN("PRESS");
        restoreCCS811Baseline();
+       drawBootWelcome(&display, "Baseline restored");
 
     }else if(D7Button.isClick()){
       if(D7Button.isDoubleClick()){
@@ -332,8 +338,9 @@ void restoreCCS811Baseline(){
          
     if(baseline > 0 && baseline != 0xFFFF){
        #ifdef CCS811_RESTORE_BASELINE
+       bool status = MCU811b.set_baseline(baseline);
        PRINT("CCS811 >>> Baseline restore ");
-       PRINTLN(MCU811b.set_baseline(baseline) ? "OK" : "FAILED");
+       PRINTLN( status ? "OK" : "FAILED");
        #endif
     }else{
        PRINTLN("CCS811 >>> Missing or wrong baseline.");
@@ -479,7 +486,7 @@ void uploadTemperatureHumidity(){
     currentWeatherClient.updateCurrent(&currentWeather, OPEN_WEATHER_MAP_APP_ID, OPEN_WEATHER_MAP_LOCATION);
 
     delay(100); //do we actually need that here?
-   PRINTLN("------------------------------------");
+    PRINTLN("------------------------------------");
 
     PRINTF("country: %s\n", currentWeather.country.c_str());// "country": "CH", String country; 
     PRINTF("cityName: %s\n", currentWeather.cityName.c_str());// "name": "Zurich", String cityName;
@@ -513,6 +520,16 @@ void uploadTemperatureHumidity(){
     readyForCurrentWeatherUpdate = false;
   }
 
+  void updateForecast(){
+    //3h forecast api. min/max values are useless
+      forecastClient.setMetric(IS_METRIC);
+      forecastClient.setLanguage(OPEN_WEATHER_MAP_LANGUAGE);
+      
+      uint8_t allowedHours[] = {12};
+      forecastClient.setAllowedHours(allowedHours, sizeof(allowedHours));
+      forecastClient.updateForecasts(forecasts, OPEN_WEATHER_MAP_APP_ID, OPEN_WEATHER_MAP_LOCATION, MAX_FORECASTS);
+  }
+
   void updateServiceData(OLEDDisplay *display) {
     if(display->isAwake()){
       drawProgress(display, 20, "Updating current weather...");
@@ -522,14 +539,9 @@ void uploadTemperatureHumidity(){
     if(display->isAwake()){
       drawProgress(display, 50, "Updating forecasts...");
     }
-      forecastClient.setMetric(IS_METRIC);
-      forecastClient.setLanguage(OPEN_WEATHER_MAP_LANGUAGE);
+      updateForecast();
       
-      uint8_t allowedHours[] = {12};
-      forecastClient.setAllowedHours(allowedHours, sizeof(allowedHours));
-      forecastClient.updateForecasts(forecasts, OPEN_WEATHER_MAP_APP_ID, OPEN_WEATHER_MAP_LOCATION, MAX_FORECASTS);
-  
-    //drawProgress(display, 90, "Updating thingspeak...");
+    //drawProgress(display, 90, "Reading thingspeak...");
       //thingspeak.getLastChannelItem(THINGSPEAK_CHANNEL_ID, THINGSPEAK_API_READ);
       
     readyForWeatherServiceUpdate = false;

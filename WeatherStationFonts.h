@@ -22,12 +22,10 @@ SOFTWARE.
 
 See more at http://blog.squix.ch
 */
-// Created by http://oleddisplay.squix.ch/ Consider a donation
-// In case of problems make sure that you are using the font file with the correct version!
-
 #define FONT_LIB_V3
 // Created by http://oleddisplay.squix.ch/ Consider a donation
 // In case of problems make sure that you are using the font file with the correct version!
+
 const uint8_t Meteocons_Plain_42[] PROGMEM = {
   0x2A, // Width: 42
   0x2C, // Height: 44

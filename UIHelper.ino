@@ -7,14 +7,19 @@
       
       //maybe free buffers, too?
       
-      displaySleepTicker.detach();
+      displaySleepTicker.detach(); //disable as it's off now
+      sensorsReadTicker.detach(); //disable sensors reading, as noone is watching
+                                  // since now sensors will be read just before uploading data
       
     }else{
+      sensorsReadTicker.attach(SENSORS_READ_AWAKE_INTERVAL_3S_SECS, setReadyForSensorsRead); //enable scheduled sensor reading
+                                                                                             // to see changes on display
+      
       ui->resetState(); //reset timers and render first frame
       display->displayOn();
       ui->enableAutoTransition();
       
-      displaySleepTicker.attach(DISPLAY_SLEEP_INTERVAL_SECS, displayOff, display);
+      displaySleepTicker.attach(DISPLAY_SLEEP_INTERVAL_5M_SECS, displayOff, display);
     }
   }
 
@@ -81,7 +86,7 @@ void drawIndoor(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int1
 
   char buf[10];
     sprintf(buf, "0x%04X", ccs811_baseline);
-  display->drawString(x, correct_y(30), "BSL " + String(buf));
+  display->drawString(x, correct_y(30), "BSL " + String(buf) + (ccs811BaselineRestored ? "!" : "..."));
 }
 
 void drawDateTime(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
@@ -122,20 +127,20 @@ void drawDateTime(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, in
 
 void drawCurrentWeather(OLEDDisplay *display, OLEDDisplayUiState* state, int16_t x, int16_t y) {
   if(!display->isAwake()){return;}
-  //  PRINTF("drawCurrentWeather: %d",display->isAwake());
+  
+  display->setFont(Meteocons_Plain_36);
+  display->setTextAlignment(TEXT_ALIGN_CENTER);
+  display->drawString(20 + x, correct_y(0), currentWeather.iconMeteoCon);
+  
+  display->setFont(ArialMT_Plain_16);
+  display->setTextAlignment(TEXT_ALIGN_LEFT);
+  String _temp = String(currentWeather.temp, 1) + (IS_METRIC ? "°C" : "°F") +" "+ String(currentWeather.humidity) + "%";
+  display->drawString(44 + x, correct_y(5), _temp);
+  display->drawString(44 + x, correct_y(21), String(currentWeather.pressure) + " hPa");
   
   display->setFont(ArialMT_Plain_10);
   display->setTextAlignment(TEXT_ALIGN_CENTER);
   display->drawString(64 + x, correct_y(38), currentWeather.description);
-
-  display->setFont(ArialMT_Plain_24);
-  display->setTextAlignment(TEXT_ALIGN_LEFT);
-  String _temp = String(currentWeather.temp, 1) + (IS_METRIC ? "°C" : "°F");
-  display->drawString(60 + x, correct_y(5), _temp);
-
-  display->setFont(Meteocons_Plain_36);
-  display->setTextAlignment(TEXT_ALIGN_CENTER);
-  display->drawString(32 + x, correct_y(0), currentWeather.iconMeteoCon);
 }
 
 
@@ -160,7 +165,10 @@ void drawForecastDetails(OLEDDisplay *display, int x, int y, int dayIndex) {
 
   display->setFont(Meteocons_Plain_21);
   display->drawString(x + 20, correct_y(y) + 12, forecasts[dayIndex].iconMeteoCon);
-  String temp = String(forecasts[dayIndex].temp, 0) + (IS_METRIC ? "°C" : "°F");
+  String temp = String(forecasts[dayIndex].tempMin, 0)
+    + "/"
+    + String(forecasts[dayIndex].tempMax, 0)
+    + (IS_METRIC ? "°C" : "°F");
   display->setFont(ArialMT_Plain_10);
   display->drawString(x + 20, correct_y(y) + 34, temp);
   display->setTextAlignment(TEXT_ALIGN_LEFT);
