@@ -44,7 +44,7 @@ esp8266, cjmcu8118+hdc1080, bmp180, ccs811, gy30, ssd1306 oled, rotated eeprom, 
 # Custom libraries and changes 
  * PinButtonEventISR
    - static library to use with button interrupts. Handles debounced clicks (single, double, may identify long click too and press*) and hold (short, long) events. (every click and hold starts with press which currently is not identified)
-   #211230 v1.1.0
+   > #211230 v1.1.0
     - fix gap after dbl click delay and before hold delay occurs
   
  * Adafruit_BMP085_Library
@@ -52,17 +52,17 @@ esp8266, cjmcu8118+hdc1080, bmp180, ccs811, gy30, ssd1306 oled, rotated eeprom, 
    - at the same time allow to calculate pressure using factory calibration
    - NB temperature compensation works like a charm, however some time needed to be completely sure 
     
- * SparkFun_CCS811_Arduino_Library
-   - read firmware, bootloader, application versions ([ported from](https://github.com/maarten-pennings/CCS811))
+ * [CCS811-master](https://github.com/maarten-pennings/CCS811)
+   - hide flash methods
    
  * esp8266-oled-ssd1306
-  #211229
+   > #211229
    - added resetState method to reset timers and move to the first frame
    - dont draw abything if display is not awake
-  #211225
+   > #211225
    - added isAwake display status flag to avoid rendering when display is off
  
  * ClosedCube_HDC1080  
-  #211225
+   > #211225
    - added begin method that allows to override default resolution parameters
 
