@@ -28,12 +28,15 @@ esp8266, cjmcu8118+hdc1080, bmp180, ccs811, gy30, ssd1306 oled, rotated eeprom, 
   	- where to store data for bulk data upload to thingspeak, i.e. for 10 min instead of 1m?
   
 # remarks
+  - CCS811 seems to be highly unpredictable...
   - tocheck# it seems it's a bad idea to train CCS811 baseline outdoors at low temperature for indoor use.
   - maybe it needs some more time to settle down?
-  - how wrong temperature compensation affects baseline training?
-
+  - how wrong temperature compensation affects baseline training (and realtime readings)?
 
   ![img](resources/images/calibrated_outdoors_negative_temperature_high_humidity.png)
+  ![img](resources/images/0xF3BC-0x1Cxx_self_update_bug.png)
+  ![img](resources/images/0xF3BC-0x1Cxx_self_update_bug2.png)
+  ![img](resources/images/0x1FBB_calibration_settle_selfcalibration_0x0FC0.png)
   
   - Power source can affect CCS811 calculation results as seen below. (~2k variation, 1 reading in 10 sec)
   
